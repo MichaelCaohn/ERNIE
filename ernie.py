@@ -138,4 +138,6 @@ if __name__=="__main__":
     q_layer.zero_grad()
     loss.backward()
     print(q_layer.centroid_table.weight.grad)
-    
+    for f in q_layer.centroid_table.parameters():
+        f.data.sub_(f.grad.data * 1)
+    print(q_layer.centroid_table.weight)
