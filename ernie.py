@@ -15,7 +15,7 @@ import copy
 from sklearn.cluster import KMeans
 
 class QuantizedLayer(nn.Module):
-    def __init__(self, layer, n_clusters, init_method, error_checking=False):
+    def __init__(self, layer, n_clusters, init_method='linear', error_checking=False):
         """
         - Come up with initial centroid locations for the layer weights
 
@@ -32,6 +32,14 @@ class QuantizedLayer(nn.Module):
         - Stored mapped weights / centroid locations
             - these should be differentiable
             - nn.ParameterList() ? 
+
+        @param layer (nn.Module): Layer to apply quantization to
+        @param n_clusters (int): Number of clusters. log_2(n_clusters) is the size in bits of each 
+                                 cluster index.
+        @param init_method (String): Method to initialize the clusters. Currently only linear init,
+                                     the method found to work best for quantization in Han et al. (2015),
+                                     is implemented.
+        @param error_checking (bool): Flag for verbose K-means and error checking print statements.
         """
         super(QuantizedLayer, self).__init__()
         orig_shape = layer.weight.shape
@@ -64,6 +72,14 @@ class QuantizedLayer(nn.Module):
         computes initial centroid locations 
         for instance, min weight, max weight, and then spaced num_centroid apart
         returns centroid mapped to value
+
+        @param weights (ndarray): Array of the weights in the layer to be compressed.
+        @param num_clusters (int): Number of clusters (see n_clusters in __init__)
+        @param init_method (String): Cluster initialization method (see init_method
+                                     in __init__)
+
+        @returns init_centroid_values (ndarray): Initial centroid values for K-means 
+                                                 clustering algorithm.
         """
         init_centroid_values = []
         if init_method == 'linear':
