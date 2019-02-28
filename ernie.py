@@ -9,6 +9,7 @@ Contains function for quantizing weights of original model
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 import copy
 
@@ -56,12 +57,12 @@ class QuantizedLayer(nn.Module):
         self.q_layer = copy.deepcopy(layer)
         
         centroid_idxs = kmeans.predict(layer_weights)
-        self.q_layer.weight = torch.nn.Parameter(torch.tensor(centroid_idxs, dtype=torch.uint8).view(orig_shape), requires_grad=False)
-        
-        self.centroid_table = {i: centroid for i, centroid  in enumerate(kmeans.cluster_centers_)}
+        self.q_layer.weight = torch.nn.Parameter(torch.tensor(centroid_idxs, dtype=torch.long).view(orig_shape))
+        centroid_table = torch.tensor(np.array([centroid for centroid in kmeans.cluster_centers_]), dtype=torch.float32)
+        self.centroid_table = nn.Embedding.from_pretrained(centroid_table)
         
         if error_checking:
-            print("Layer weights flattened: ", layer_weights)
+            print("Layer weights: ", layer_weights)
             print("Init centroid values: ", init_centroid_values)
             print("Centroid locations after k means", kmeans.cluster_centers_)
             print("Quantized Layer weights (should be idxs): ", self.q_layer.weight)
@@ -97,7 +98,10 @@ class QuantizedLayer(nn.Module):
         - Somehow replace centroid locations in stored matrix with true centroid weights
         - If that doesn't work, construct PyTorch `Function` https://pytorch.org/docs/master/notes/extending.html
         """
-        raise NotImplementedError()
+        orig_shape = self.q_layer.weight.shape
+        weights = self.centroid_table(self.q_layer.weight.flatten()).view(orig_shape)
+        out = F.linear(input_, weights, bias=False) # TODO: Quantize bias
+        return out
         
 def quantize(self, model, dataset, num_centroids):
     """
@@ -121,7 +125,10 @@ if __name__=="__main__":
     
     """
     linear = nn.Linear(2, 2)
-    
+    input_ = torch.tensor([2, 2], dtype=torch.float32)
+    print(input_)
     q_layer = QuantizedLayer(linear, 2, "linear", error_checking=True)
-    print(q_layer.centroid_table)
+    out = q_layer(input_)
+    loss = 1 - out
+    loss.backward()
     
