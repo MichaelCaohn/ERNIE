@@ -57,9 +57,9 @@ class QuantizedLayer(nn.Module):
         self.q_layer = copy.deepcopy(layer)
         
         centroid_idxs = kmeans.predict(layer_weights)
-        self.q_layer.weight = torch.nn.Parameter(torch.tensor(centroid_idxs, dtype=torch.long).view(orig_shape))
+        self.q_layer.weight = torch.nn.Parameter(torch.tensor(centroid_idxs, dtype=torch.long).view(orig_shape), requires_grad=False)
         centroid_table = torch.tensor(np.array([centroid for centroid in kmeans.cluster_centers_]), dtype=torch.float32)
-        self.centroid_table = nn.Embedding.from_pretrained(centroid_table)
+        self.centroid_table = nn.Embedding.from_pretrained(centroid_table, freeze=False)
         
         if error_checking:
             print("Layer weights: ", layer_weights)
@@ -99,7 +99,7 @@ class QuantizedLayer(nn.Module):
         - If that doesn't work, construct PyTorch `Function` https://pytorch.org/docs/master/notes/extending.html
         """
         orig_shape = self.q_layer.weight.shape
-        weights = self.centroid_table(self.q_layer.weight.flatten()).view(orig_shape)
+        weights = self.centroid_table(self.q_layer.weight.flatten().long()).view(orig_shape)
         out = F.linear(input_, weights, bias=False) # TODO: Quantize bias
         return out
         
@@ -125,10 +125,17 @@ if __name__=="__main__":
     
     """
     linear = nn.Linear(2, 2)
-    input_ = torch.tensor([2, 2], dtype=torch.float32)
+    linear.weight = torch.nn.Parameter(torch.tensor([[0, 0], [1, 3]], dtype=torch.float32))
+    input_ = torch.tensor([2, 1], dtype=torch.float32)
     print(input_)
     q_layer = QuantizedLayer(linear, 2, "linear", error_checking=True)
+    L1_loss = nn.L1Loss(size_average=False)
+    target = torch.tensor([1, -1], dtype=torch.float32)
     out = q_layer(input_)
-    loss = 1 - out
+    loss = sum(target- out)
+    print("out: ", out)
+    print("loss: ", loss)
+    q_layer.zero_grad()
     loss.backward()
+    print(q_layer.centroid_table.weight.grad)
     
