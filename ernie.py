@@ -140,7 +140,7 @@ def quantize(self, model, num_centroids):
     num_linear = len([l for l in nn.modules() if type(l) == nn.Linear])
     children = model.children()
     length = len(children)
-    new_layers = [] # TODO -  add into quantized_model using .add_module(), test backwards adding?
+    new_layers = [] 
     for i in range(length):
         layer = children[length]
         if type(layer) == nn.Sequential:
@@ -151,8 +151,8 @@ def quantize(self, model, num_centroids):
         else: 
             continue
     error_check(quantized_model, num_linear)
-    return num_layers
-    #return quantized_model
+    quantized_model = nn.ModuleList(new_layers)
+    return quantized_model
 if __name__=="__main__":
     """ Unit test for quantization
     
