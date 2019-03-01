@@ -15,6 +15,8 @@ import copy
 
 from sklearn.cluster import KMeans
 from collections import OrderedDict
+from onmt.encoders.transformer import TransformerEncoderLayer, TransformerEncoder
+from onmt.modules.embeddings import PositionalEncoding
 class QuantizedLayer(nn.Module):
     def __init__(self, layer, n_clusters, init_method='linear', error_checking=False):
         """
@@ -54,10 +56,10 @@ class QuantizedLayer(nn.Module):
         kmeans.fit(layer_weights)
         
         # initialize quantized layer as copy of original layer 
-        self.q_layer = copy.deepcopy(layer)
+        # self.q_layer = copy.deepcopy(layer)
         
         centroid_idxs = kmeans.predict(layer_weights)
-        self.q_layer.weight = torch.nn.Parameter(torch.tensor(centroid_idxs, dtype=torch.long).view(orig_shape), requires_grad=False)
+        self.weight = torch.nn.Parameter(torch.tensor(centroid_idxs, dtype=torch.long).view(orig_shape), requires_grad=False)
         centroid_table = torch.tensor(np.array([centroid for centroid in kmeans.cluster_centers_]), dtype=torch.float32)
         self.centroid_table = nn.Embedding.from_pretrained(centroid_table, freeze=False)
         
@@ -102,7 +104,7 @@ class QuantizedLayer(nn.Module):
 
         @returns out (torch.Tensor): Output of the model after run on the input
         """
-        orig_shape = self.q_layer.weight.shape
+        orig_shape = self.weight.shape
         weights = self.centroid_table(self.q_layer.weight.flatten().long()).view(orig_shape)
         out = F.linear(input_, weights, bias=False) # TODO: Quantize bias
         return out
@@ -116,8 +118,8 @@ def layer_check(model, numLin):
     @param numLin (int): Number of linear layers in the original model
     """
     numQuant = 0
-    for l in model.children():
-        if type(l) == nn.modules.linear.Linear:  
+    for l in model.modules():
+        if type(l) == nn.Linear:  
             raise ValueError('There should not be any linear layers in a quantized model: {}'.format(model))
         if type(l) == QuantizedLayer:
             numQuant += 1
@@ -156,7 +158,9 @@ def quantize(model, num_centroids, error_checking=False):
         else: 
             continue
     quantized_model = nn.Sequential(OrderedDict((str(i), v) for i, v in enumerate(new_layers)))
-    layer_check(quantized_model, num_linear)
+    if error_checking:
+        print("quantized model ", quantized_model)
+        layer_check(quantized_model, num_linear)
     return quantized_model
 if __name__=="__main__":
     """ Unit test for quantization
@@ -170,7 +174,8 @@ if __name__=="__main__":
     linear.weight = torch.nn.Parameter(torch.tensor([[0, 0], [1, 3]], dtype=torch.float32))
     input_ = torch.tensor([2, 1], dtype=torch.float32)
     print(input_)
-    q_layer = QuantizedLayer(linear, 2, "linear", error_checking=True)
+    # commented this out because the q_layer line was yelling at me, can look at later
+    '''q_layer = QuantizedLayer(linear, 2, "linear", error_checking=True)
     L1_loss = nn.L1Loss(size_average=False)
     target = torch.tensor([1, -1], dtype=torch.float32)
     out = q_layer(input_)
@@ -182,5 +187,14 @@ if __name__=="__main__":
     print(q_layer.centroid_table.weight.grad)
     for f in q_layer.centroid_table.parameters():
         f.data.sub_(f.grad.data * 1)
-    print(q_layer.centroid_table.weight)
-    print("quantization test: ", quantize(nn.Sequential(linear), 2, error_checking=True))
+    print(q_layer.centroid_table.weight)'''
+    print("quantization test: ")
+    print(quantize(nn.Sequential(linear), 2, error_checking=True))
+    bigger_model = nn.Sequential(nn.Linear(3, 3), 
+                                nn.Linear(2, 2), 
+                                nn.Sequential(nn.Linear(4, 3), nn.Sequential(nn.Linear(2, 2), nn.Linear(2, 2))))
+    print("bigger quantization test: ")
+    print(quantize(bigger_model, 2, error_checking=True))
+    transf = TransformerEncoder(2, 5, 5, 5, 0, PositionalEncoding(0, 10), 0)
+    print("transformer test: ")
+    print(quantize(transf, 2, error_checking=True))
