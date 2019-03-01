@@ -97,25 +97,62 @@ class QuantizedLayer(nn.Module):
         """
         - Somehow replace centroid locations in stored matrix with true centroid weights
         - If that doesn't work, construct PyTorch `Function` https://pytorch.org/docs/master/notes/extending.html
+
+        @param input_ (torch.Tensor): Input for the forward pass (x value)
+
+        @returns out (torch.Tensor): Output of the model after run on the input
         """
         orig_shape = self.q_layer.weight.shape
         weights = self.centroid_table(self.q_layer.weight.flatten().long()).view(orig_shape)
         out = F.linear(input_, weights, bias=False) # TODO: Quantize bias
         return out
-        
-def quantize(self, model, dataset, num_centroids):
+     
+def error_check(model, numLin):
     """
-    1. Iterates through model layers backwards
+    Checks that there are no linear layers in the quantized model, and checks that the number of 
+    quantized layers is equal to the number of initial linear layers.
+
+    @param model (nn.Module): Quantized model
+    @param numLin (int): Number of linear layers in the original model
+    """
+    numQuant = 0
+    for l in model.modules():
+        if type(l) == nn.modules.linear.Linear:  
+            raise ValueError('There should not be any linear layers in a quantized model: {}'.format(model))
+        if type(l) == QuantizedLayer:
+            numQuant += 1
+    if numQuant != numLin:
+        raise ValueError('The number of quantized layers ({}) should be equal to the number of linear layers ({})'.format(
+            numQuant, numLin))
+def quantize(self, model, num_centroids):
+    """
+    1. Iterates through model layers backwards (right now it is forward)
     
     2. For each layer in the model
     
         2.a Replace the layer with a QuantizedLayer
-        
-        2.b Train for some number of epochs
+
+    @param model (nn.Module): Model to quantize
+    @param num_centroids (int): See n_clusters in QuantizedLayer().__init__()
+
+    @returns quantized_model (nn.Module): model with all layers quantized
     """
-        
-    pass
-        
+    num_linear = len([l for l in nn.modules() if type(l) == nn.Linear])
+    children = model.children()
+    length = len(children)
+    new_layers = [] # TODO -  add into quantized_model using .add_module(), test backwards adding?
+    for i in range(length):
+        layer = children[length]
+        if type(layer) == nn.Sequential:
+            new_seq_layer = quantize(layer, num_centroids)
+            new_layers.append(new_seq_layer)
+        elif type(layer) == nn.Linear:
+            new_layers.add(QuantizedLayer(layer, num_centroids))
+        else: 
+            continue
+    error_check(quantized_model, num_linear)
+    return num_layers
+    #return quantized_model
 if __name__=="__main__":
     """ Unit test for quantization
     
