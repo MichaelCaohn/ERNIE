@@ -14,7 +14,7 @@ import numpy as np
 import copy
 
 from sklearn.cluster import KMeans
-
+from collections import OrderedDict
 class QuantizedLayer(nn.Module):
     def __init__(self, layer, n_clusters, init_method='linear', error_checking=False):
         """
@@ -107,7 +107,7 @@ class QuantizedLayer(nn.Module):
         out = F.linear(input_, weights, bias=False) # TODO: Quantize bias
         return out
      
-def error_check(model, numLin):
+def layer_check(model, numLin):
     """
     Checks that there are no linear layers in the quantized model, and checks that the number of 
     quantized layers is equal to the number of initial linear layers.
@@ -116,7 +116,7 @@ def error_check(model, numLin):
     @param numLin (int): Number of linear layers in the original model
     """
     numQuant = 0
-    for l in model.modules():
+    for l in model.children():
         if type(l) == nn.modules.linear.Linear:  
             raise ValueError('There should not be any linear layers in a quantized model: {}'.format(model))
         if type(l) == QuantizedLayer:
@@ -124,9 +124,10 @@ def error_check(model, numLin):
     if numQuant != numLin:
         raise ValueError('The number of quantized layers ({}) should be equal to the number of linear layers ({})'.format(
             numQuant, numLin))
-def quantize(self, model, num_centroids):
+def quantize(model, num_centroids, error_checking=False):
     """
-    1. Iterates through model layers backwards (right now it is forward)
+    1. Iterates through model layers forward
+    TODO - test backward
     
     2. For each layer in the model
     
@@ -137,21 +138,25 @@ def quantize(self, model, num_centroids):
 
     @returns quantized_model (nn.Module): model with all layers quantized
     """
-    num_linear = len([l for l in nn.modules() if type(l) == nn.Linear])
+    num_linear = len([l for l in model.modules() if type(l) == nn.Linear])
     children = model.children()
-    length = len(children)
-    new_layers = [] 
-    for i in range(length):
-        layer = children[length]
+    #length = len(list(children))
+    new_layers = []
+    if error_checking:
+        print("original model: ", model)
+        print("number of linear layers in original model: ", num_linear) 
+        print("children of original model: ", children)
+    for layer in children:
+        #layer = children[length]
         if type(layer) == nn.Sequential:
             new_seq_layer = quantize(layer, num_centroids)
             new_layers.append(new_seq_layer)
         elif type(layer) == nn.Linear:
-            new_layers.add(QuantizedLayer(layer, num_centroids))
+            new_layers.append(QuantizedLayer(layer, num_centroids))
         else: 
             continue
-    error_check(quantized_model, num_linear)
-    quantized_model = nn.ModuleList(new_layers)
+    quantized_model = nn.Sequential(OrderedDict((str(i), v) for i, v in enumerate(new_layers)))
+    layer_check(quantized_model, num_linear)
     return quantized_model
 if __name__=="__main__":
     """ Unit test for quantization
@@ -178,3 +183,4 @@ if __name__=="__main__":
     for f in q_layer.centroid_table.parameters():
         f.data.sub_(f.grad.data * 1)
     print(q_layer.centroid_table.weight)
+    print("quantization test: ", quantize(nn.Sequential(linear), 2, error_checking=True))
