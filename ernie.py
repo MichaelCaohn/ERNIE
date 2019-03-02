@@ -13,7 +13,7 @@ import torch.nn.functional as F
 import numpy as np
 import copy
 
-from sklearn.cluster import KMeans
+from sklearn.cluster import MiniBatchKMeans
 from collections import OrderedDict
 from onmt.encoders.transformer import TransformerEncoderLayer, TransformerEncoder
 from onmt.modules.embeddings import PositionalEncoding
@@ -46,30 +46,14 @@ class QuantizedLayer(nn.Module):
         @param error_checking (bool): Flag for verbose K-means and error checking print statements.
         """
         super(QuantizedLayer, self).__init__()
-        orig_shape = layer.weight.shape
-        layer_weights = layer.weight.detach().flatten().numpy().reshape((-1, 1))
         
-        #  Come up with initial centroid locations for the layer weights
-        init_centroid_values = self.init_centroid_weights(layer_weights, n_clusters, init_method)
-        kmeans = KMeans(n_clusters, init=init_centroid_values, 
-                        n_init=1, max_iter=100, precompute_distances=True, 
-                        verbose=error_checking)
-        kmeans.fit(layer_weights)
+        self.weight, self.weight_table = self.quantize_params(layer.weight, n_clusters, init_method, error_checking)
         
-        # initialize quantized layer as copy of original layer 
-        # self.q_layer = copy.deepcopy(layer)
-        
-        centroid_idxs = kmeans.predict(layer_weights)
-        self.weight = torch.nn.Parameter(torch.tensor(centroid_idxs, dtype=torch.long).view(orig_shape), requires_grad=False)
-        centroid_table = torch.tensor(np.array([centroid for centroid in kmeans.cluster_centers_]), dtype=torch.float32)
-        self.centroid_table = nn.Embedding.from_pretrained(centroid_table, freeze=False)
-        
-        if error_checking:
-            print("Layer weights: ", layer_weights)
-            print("Init centroid values: ", init_centroid_values)
-            print("Centroid locations after k means", kmeans.cluster_centers_)
-            print("Quantized Layer weights (should be idxs): ", self.q_layer.weight)
-            print("Centroid table: ", self.centroid_table)
+        if layer.bias is not None:
+            self.bias, self.bias_table = self.quantize_params(layer.bias, n_clusters, init_method, error_checking)
+        else:
+            self.bias = None
+    
         
     def init_centroid_weights(self, weights, num_clusters, init_method):
         """
@@ -95,6 +79,25 @@ class QuantizedLayer(nn.Module):
             
         return init_centroid_values.reshape(-1, 1) # reshape for KMeans -- expects centroids, features
         
+    def quantize_params(self, params, n_clusters, init_method, error_checking=False):
+        orig_shape = params.shape
+        flat_params = params.detach().flatten().numpy().reshape((-1, 1))
+        init_centroid_values = self.init_centroid_weights(flat_params, n_clusters, init_method)
+        kmeans = MiniBatchKMeans(n_clusters, init=init_centroid_values, n_init=1, max_iter=100, verbose=error_checking)
+        kmeans.fit(flat_params)
+        centroid_idxs = kmeans.predict(flat_params)
+        q_params = torch.nn.Parameter(torch.tensor(centroid_idxs, dtype=torch.long).view(orig_shape), requires_grad=False)
+        centroid_table = torch.tensor(np.array([centroid for centroid in kmeans.cluster_centers_]), dtype=torch.float32)
+        param_table = nn.Embedding.from_pretrained(centroid_table, freeze=False)
+        
+        if error_checking:
+            print("Layer weights: ", params)
+            print("Init centroid values: ", init_centroid_values)
+            print("Centroid locations after k means", kmeans.cluster_centers_)
+            print("Quantized Layer weights (should be idxs): ", q_params)
+            print("Centroid table: ", param_table)
+            
+        return q_params, param_table
         
     def forward(self, input_):
         """
@@ -105,9 +108,10 @@ class QuantizedLayer(nn.Module):
 
         @returns out (torch.Tensor): Output of the model after run on the input
         """
-        orig_shape = self.weight.shape
-        weights = self.centroid_table(self.q_layer.weight.flatten().long()).view(orig_shape)
-        out = F.linear(input_, weights, bias=False) # TODO: Quantize bias
+        orig_weight_shape, orig_bias_shape = self.weight.shape, self.bias.shape
+        weights = self.weight_table(self.weight.flatten().long()).view(orig_weight_shape)
+        bias = self.bias_table(self.bias.flatten().long()).view(orig_bias_shape) if self.bias is not None else None
+        out = F.linear(input_, weights, bias=bias)
         return out
      
 def layer_check(model, numLin):
@@ -150,6 +154,7 @@ def quantize(model, num_centroids, error_checking=False):
     
     for name, layer in model.named_children():
         if type(layer) == nn.Linear:
+            print(name)
             model.__dict__['_modules'][name] = QuantizedLayer(layer, num_centroids)
         else:
             layer_types = [type(l) for l in layer.modules()]
@@ -171,10 +176,12 @@ if __name__=="__main__":
     """
     linear = nn.Linear(2, 2)
     linear.weight = torch.nn.Parameter(torch.tensor([[0, 0], [1, 3]], dtype=torch.float32))
+    linear.bias = torch.nn.Parameter(torch.tensor([1, 2], dtype=torch.float32))
     input_ = torch.tensor([2, 1], dtype=torch.float32)
-    print(input_)
+    print("=" * 100)
+    print("Input: ", input_)
     # commented this out because the q_layer line was yelling at me, can look at later
-    '''q_layer = QuantizedLayer(linear, 2, "linear", error_checking=True)
+    q_layer = QuantizedLayer(linear, 2, "linear", error_checking=True)
     L1_loss = nn.L1Loss(size_average=False)
     target = torch.tensor([1, -1], dtype=torch.float32)
     out = q_layer(input_)
@@ -183,10 +190,10 @@ if __name__=="__main__":
     print("loss: ", loss)
     q_layer.zero_grad()
     loss.backward()
-    print(q_layer.centroid_table.weight.grad)
-    for f in q_layer.centroid_table.parameters():
+    print(q_layer.weight_table.weight.grad)
+    for f in q_layer.weight_table.parameters():
         f.data.sub_(f.grad.data * 1)
-    print(q_layer.centroid_table.weight)'''
+    print(q_layer.weight_table.weight)
     print("quantization test: ")
     print(quantize(nn.Sequential(linear), 2, error_checking=True))
     print("=" * 100)

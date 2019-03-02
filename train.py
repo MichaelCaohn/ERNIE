@@ -11,7 +11,6 @@ from onmt.utils.logging import logger
 from onmt.train_single import main as single_main
 from onmt.utils.parse import ArgumentParser
 
-
 def main(opt):
     ArgumentParser.validate_train_opts(opt)
     ArgumentParser.update_model_opts(opt)
