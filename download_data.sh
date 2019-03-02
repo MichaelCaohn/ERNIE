@@ -14,11 +14,11 @@ mkdir temp
 mkdir wmt14-en-de
 
 # unpack all
-tar -xvzf training-parallel-europarl-v7.tar -C temp
-tar -xvzf training-parallel-commoncrawl.tar -C temp
-tar -xvzf training-parallel-nc-v9.tar -C temp
-tar -xvzf dev.tar -C temp
-tar -xvzf test-full.tar -C temp
+tar -xvzf training-parallel-europarl-v7.tgz -C temp
+tar -xvzf training-parallel-commoncrawl.tgz -C temp
+tar -xvzf training-parallel-nc-v9.tgz -C temp
+tar -xvzf dev.tgz -C temp
+tar -xvzf test-full.tgz -C temp
 
 # combine en-de files and copy to final data dir
 cat temp/commoncrawl.de-en.en temp/training/europarl-v7.de-en.en temp/training/news-commentary-v9.de-en.en > wmt14-en-de/train.en
