@@ -17,6 +17,7 @@ from sklearn.cluster import KMeans
 from collections import OrderedDict
 from onmt.encoders.transformer import TransformerEncoderLayer, TransformerEncoder
 from onmt.modules.embeddings import PositionalEncoding
+
 class QuantizedLayer(nn.Module):
     def __init__(self, layer, n_clusters, init_method='linear', error_checking=False):
         """
@@ -126,6 +127,7 @@ def layer_check(model, numLin):
     if numQuant != numLin:
         raise ValueError('The number of quantized layers ({}) should be equal to the number of linear layers ({})'.format(
             numQuant, numLin))
+        
 def quantize(model, num_centroids, error_checking=False):
     """
     1. Iterates through model layers forward
@@ -140,28 +142,25 @@ def quantize(model, num_centroids, error_checking=False):
 
     @returns quantized_model (nn.Module): model with all layers quantized
     """
-    num_linear = len([l for l in model.modules() if type(l) == nn.Linear])
-    children = model.children()
-    #length = len(list(children))
-    new_layers = []
     if error_checking:
+        num_linear = len([l for l in model.modules() if type(l) == nn.Linear])
         print("original model: ", model)
         print("number of linear layers in original model: ", num_linear) 
-        print("children of original model: ", children)
-    for layer in children:
-        #layer = children[length]
-        if type(layer) == nn.Sequential:
-            new_seq_layer = quantize(layer, num_centroids)
-            new_layers.append(new_seq_layer)
-        elif type(layer) == nn.Linear:
-            new_layers.append(QuantizedLayer(layer, num_centroids))
-        else: 
-            continue
-    quantized_model = nn.Sequential(OrderedDict((str(i), v) for i, v in enumerate(new_layers)))
+        print("=" * 100)
+    
+    for name, layer in model.named_children():
+        if type(layer) == nn.Linear:
+            model.__dict__['_modules'][name] = QuantizedLayer(layer, num_centroids)
+        else:
+            layer_types = [type(l) for l in layer.modules()]
+            if nn.Linear in layer_types:
+                quantize(layer, num_centroids, error_checking)
+          
     if error_checking:
-        print("quantized model ", quantized_model)
-        layer_check(quantized_model, num_linear)
-    return quantized_model
+        layer_check(model, num_linear)
+        
+    return model
+
 if __name__=="__main__":
     """ Unit test for quantization
     
@@ -190,11 +189,17 @@ if __name__=="__main__":
     print(q_layer.centroid_table.weight)'''
     print("quantization test: ")
     print(quantize(nn.Sequential(linear), 2, error_checking=True))
+    print("=" * 100)
     bigger_model = nn.Sequential(nn.Linear(3, 3), 
                                 nn.Linear(2, 2), 
                                 nn.Sequential(nn.Linear(4, 3), nn.Sequential(nn.Linear(2, 2), nn.Linear(2, 2))))
+    
     print("bigger quantization test: ")
     print(quantize(bigger_model, 2, error_checking=True))
+    print("=" * 100)
     transf = TransformerEncoder(2, 5, 5, 5, 0, PositionalEncoding(0, 10), 0)
     print("transformer test: ")
-    print(quantize(transf, 2, error_checking=True))
+    print(transf)
+
+    q_transf = quantize(transf, 2, error_checking=False)
+    print(q_transf)
