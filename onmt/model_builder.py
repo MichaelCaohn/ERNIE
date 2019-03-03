@@ -189,7 +189,6 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
         checkpoint['model'] = {fix_key(k): v
                                for k, v in checkpoint['model'].items()}
         # end of patch for backward compatibility
-
         model.load_state_dict(checkpoint['model'], strict=False)
         generator.load_state_dict(checkpoint['generator'], strict=False)
     else:
@@ -214,9 +213,9 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
                 model_opt.pre_word_vecs_dec)
     
     model.generator = generator
-    print(model)
-    quantize(model, 2 ** 8)
-    print(model)
+#     print(model)
+#     quantize(model, 2 ** 8)
+#     print(model)
     model.to(device)
     if model_opt.model_dtype == 'fp16':
         model.half()

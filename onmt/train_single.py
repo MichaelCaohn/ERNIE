@@ -86,7 +86,6 @@ def main(opt, device_id):
     logger.info('decoder: %d' % dec)
     logger.info('* number of parameters: %d' % n_params)
     _check_save_model_path(opt)
-
     # Build optimizer.
     optim = Optimizer.from_opt(model, opt, checkpoint=checkpoint)
 
@@ -105,6 +104,7 @@ def main(opt, device_id):
     else:
         logger.info('Starting training on CPU, could be very slow')
     train_steps = opt.train_steps
+
     if opt.single_pass and train_steps > 0:
         logger.warning("Option single_pass is enabled, ignoring train_steps.")
         train_steps = 0
