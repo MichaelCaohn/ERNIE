@@ -18,7 +18,6 @@ def model_opts(parser):
     These options are passed to the construction of the model.
     Be careful with these as they will be used during translation.
     """
-
     # Embedding Options
     group = parser.add_argument_group('Model-Embeddings')
     group.add('--src_word_vec_size', '-src_word_vec_size',
@@ -180,6 +179,12 @@ def model_opts(parser):
               help="For FP16 training, the static loss scale to use. If not "
                    "set, the loss scale is dynamically computed.")
 
+    # quantization options
+    group.add('--n_clusters', '-n_clusters', type=int, default=8, 
+              help='number of centroids to use for quantziation')
+    
+    group.add('--from_quantized', '-from_quantized', action='store_true', default=False,
+              help="Load a quantized model from path instead of a normal one.")
 
 def preprocess_opts(parser):
     """ Pre-procesing options """
@@ -457,7 +462,6 @@ def train_opts(parser):
               help="Step for moving average. "
                    "Default is every update, "
                    "if -average_decay is set.")
-
     # learning rate
     group = parser.add_argument_group('Optimization- Rate')
     group.add('--learning_rate', '-learning_rate', type=float, default=1.0,
@@ -535,7 +539,10 @@ def translate_opts(parser):
                    "raw probabilities and then taking the log. Otherwise, "
                    "the log probabilities will be averaged directly. "
                    "Necessary for models whose output layers can assign "
-                   "zero probability.")
+                   "zero probability.")    
+    group.add('--from_quantized', '-from_quantized', action='store_true', default=False,
+              help="Load a quantized model from path instead of a normal one.")
+
 
     group = parser.add_argument_group('Data')
     group.add('--data_type', '-data_type', default="text",

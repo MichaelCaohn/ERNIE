@@ -19,7 +19,7 @@ from onmt.encoders.transformer import TransformerEncoderLayer, TransformerEncode
 from onmt.modules.embeddings import PositionalEncoding
 
 class QuantizedLayer(nn.Module):
-    def __init__(self, layer, n_clusters, init_method='linear', error_checking=False):
+    def __init__(self, layer, n_clusters, init_method='linear', error_checking=False, fast=False):
         """
         - Come up with initial centroid locations for the layer weights
 
@@ -47,10 +47,10 @@ class QuantizedLayer(nn.Module):
         """
         super(QuantizedLayer, self).__init__()
         
-        self.weight, self.weight_table = self.quantize_params(layer.weight, n_clusters, init_method, error_checking)
+        self.weight, self.weight_table = self.quantize_params(layer.weight, n_clusters, init_method, error_checking, fast)
         
         if layer.bias is not None:
-            self.bias, self.bias_table = self.quantize_params(layer.bias, n_clusters, init_method, error_checking)
+            self.bias, self.bias_table = self.quantize_params(layer.bias, n_clusters, init_method, error_checking, fast)
         else:
             self.bias = None
     
@@ -79,11 +79,12 @@ class QuantizedLayer(nn.Module):
             
         return init_centroid_values.reshape(-1, 1) # reshape for KMeans -- expects centroids, features
         
-    def quantize_params(self, params, n_clusters, init_method, error_checking=False):
+    def quantize_params(self, params, n_clusters, init_method, error_checking=False, fast=False):
         orig_shape = params.shape
         flat_params = params.detach().flatten().numpy().reshape((-1, 1))
         init_centroid_values = self.init_centroid_weights(flat_params, n_clusters, init_method)
-        kmeans = MiniBatchKMeans(n_clusters, init=init_centroid_values, n_init=1, max_iter=100, verbose=error_checking)
+        max_iter = 1 if fast else 100
+        kmeans = MiniBatchKMeans(n_clusters, init=init_centroid_values, n_init=1, max_iter=max_iter, verbose=error_checking)
         kmeans.fit(flat_params)
         centroid_idxs = kmeans.predict(flat_params)
         q_params = torch.nn.Parameter(torch.tensor(centroid_idxs, dtype=torch.long).view(orig_shape), requires_grad=False)
@@ -132,7 +133,7 @@ def layer_check(model, numLin):
         raise ValueError('The number of quantized layers ({}) should be equal to the number of linear layers ({})'.format(
             numQuant, numLin))
         
-def quantize(model, num_centroids, error_checking=False):
+def quantize(model, num_centroids, error_checking=False, fast=False):
     """
     1. Iterates through model layers forward
     TODO - test backward
@@ -159,7 +160,7 @@ def quantize(model, num_centroids, error_checking=False):
         else:
             layer_types = [type(l) for l in layer.modules()]
             if nn.Linear in layer_types:
-                quantize(layer, num_centroids, error_checking)
+                quantize(layer, num_centroids, error_checking, fast)
           
     if error_checking:
         layer_check(model, num_linear)

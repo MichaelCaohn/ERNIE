@@ -84,10 +84,12 @@ def load_test_model(opt, model_path=None):
         model_path = opt.models[0]
     checkpoint = torch.load(model_path,
                             map_location=lambda storage, loc: storage)
-
+    
+    
     model_opt = ArgumentParser.ckpt_model_opts(checkpoint['opt'])
     ArgumentParser.update_model_opts(model_opt)
     ArgumentParser.validate_model_opts(model_opt)
+    
     vocab = checkpoint['vocab']
     if inputters.old_style_vocab(vocab):
         fields = inputters.load_old_vocab(
@@ -97,7 +99,7 @@ def load_test_model(opt, model_path=None):
         fields = vocab
 
     model = build_base_model(model_opt, fields, use_gpu(opt), checkpoint,
-                             opt.gpu)
+                             opt.gpu, from_quantized=opt.from_quantized)
     if opt.fp32:
         model.float()
     model.eval()
@@ -105,7 +107,7 @@ def load_test_model(opt, model_path=None):
     return fields, model, model_opt
 
 
-def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
+def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None, from_quantized=False):
     """Build a model from opts.
 
     Args:
@@ -189,6 +191,9 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
         checkpoint['model'] = {fix_key(k): v
                                for k, v in checkpoint['model'].items()}
         # end of patch for backward compatibility
+        if from_quantized:
+            print(model_opt.n_clusters)
+            model = quantize(model, 2 ** model_opt.n_clusters, fast=True)
         model.load_state_dict(checkpoint['model'], strict=False)
         generator.load_state_dict(checkpoint['generator'], strict=False)
     else:
@@ -214,8 +219,8 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
     
     model.generator = generator
 #     print(model)
-#     quantize(model, 2 ** 8)
-#     print(model)
+    if not model_opt.from_quantized:
+        quantize(model, 2 ** model_opt.n_clusters)
     model.to(device)
     if model_opt.model_dtype == 'fp16':
         model.half()

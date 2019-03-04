@@ -53,6 +53,7 @@ def main(opt, device_id):
         model_opt = ArgumentParser.ckpt_model_opts(checkpoint["opt"])
         ArgumentParser.update_model_opts(model_opt)
         ArgumentParser.validate_model_opts(model_opt)
+        model_opt.n_clusters = opt.n_clusters
         logger.info('Loading vocab from checkpoint at %s.' % opt.train_from)
         vocab = checkpoint['vocab']
     else:
