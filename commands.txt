@@ -8,3 +8,4 @@ CUDA_VISIBLE_DEVICES=0 python train.py -data data/wmt14 -save_model /tmp/extra \
         -label_smoothing 0.1 -valid_steps 50 -save_checkpoint_steps 50 \
         -world_size 1 -gpu_ranks 0 --train_from averaged-10-epoch.pt
 
+python translate.py -model /tmp/quantized_step_150.pt -src newstest2017-ende-src.en -tgt newstest2017-ende-ref.de -output output.txt -report_time -gpu 1 --from_quantized
