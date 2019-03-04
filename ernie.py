@@ -50,7 +50,7 @@ class QuantizedLayer(nn.Module):
         self.weight, self.weight_table = self.quantize_params(layer.weight, n_clusters, init_method, error_checking, fast)
         
         if layer.bias is not None:
-            self.bias, self.bias_table = self.quantize_params(layer.bias, n_clusters, init_method, error_checking, fast)
+            self.bias, self.bias_table = self.quantize_params(layer.bias, 2 ** 8, init_method, error_checking, fast)
         else:
             self.bias = None
     
@@ -82,7 +82,6 @@ class QuantizedLayer(nn.Module):
     def quantize_params(self, params, n_clusters, init_method, error_checking=False, fast=False):
         orig_shape = params.shape
         flat_params = params.detach().flatten().numpy().reshape((-1, 1))
-        
         if fast:
             centroid_idxs = [[0] for _ in range(len(flat_params))]
             centroid_table = torch.tensor(np.array([[0] for _ in range(n_clusters)]), dtype=torch.float32)

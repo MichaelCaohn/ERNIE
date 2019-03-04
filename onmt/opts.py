@@ -359,6 +359,8 @@ def train_opts(parser):
     group.add('--reset_optim', '-reset_optim', default='none',
               choices=['none', 'all', 'states', 'keep_states'],
               help="Optimization resetter when train_from.")
+    group.add('--fine_tune', '-fine_tune', default=False, action='store_true',
+              help='fine tune pretrained models.')
 
     # Pretrained word vectors
     group.add('--pre_word_vecs_enc', '-pre_word_vecs_enc',

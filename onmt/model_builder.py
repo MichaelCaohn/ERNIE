@@ -124,7 +124,7 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None, from_
     Returns:
         the NMTModel.
     """
-
+    print(vars(model_opt))
     # Build embeddings.
     if model_opt.model_type == "text":
         src_field = fields["src"]

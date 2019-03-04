@@ -53,7 +53,10 @@ def main(opt, device_id):
         model_opt = ArgumentParser.ckpt_model_opts(checkpoint["opt"])
         ArgumentParser.update_model_opts(model_opt)
         ArgumentParser.validate_model_opts(model_opt)
-        model_opt.n_clusters = opt.n_clusters
+        if opt.fine_tune:
+            model_opt.learning_rate = opt.learning_rate
+            model_opt.warmup_steps = opt.warmup_steps
+        
         logger.info('Loading vocab from checkpoint at %s.' % opt.train_from)
         vocab = checkpoint['vocab']
     else:
