@@ -192,9 +192,12 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None, from_
                                for k, v in checkpoint['model'].items()}
         # end of patch for backward compatibility
         if from_quantized:
-            print(model_opt.n_clusters)
+            print("LOADING A QUANTIZED MODEL IN")
             model = quantize(model, 2 ** model_opt.n_clusters, fast=True)
+            print(model.encoder.transformer[0].self_attn.linear_keys.weight)
         model.load_state_dict(checkpoint['model'], strict=False)
+        print(model.encoder.transformer[0].self_attn.linear_keys.weight)
+            
         generator.load_state_dict(checkpoint['generator'], strict=False)
     else:
         if model_opt.param_init != 0.0:
@@ -217,10 +220,9 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None, from_
             model.decoder.embeddings.load_pretrained_vectors(
                 model_opt.pre_word_vecs_dec)
     
-    model.generator = generator
-#     print(model)
     if not model_opt.from_quantized:
         quantize(model, 2 ** model_opt.n_clusters)
+    model.generator = generator
     model.to(device)
     if model_opt.model_dtype == 'fp16':
         model.half()

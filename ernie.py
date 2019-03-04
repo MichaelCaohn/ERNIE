@@ -82,13 +82,18 @@ class QuantizedLayer(nn.Module):
     def quantize_params(self, params, n_clusters, init_method, error_checking=False, fast=False):
         orig_shape = params.shape
         flat_params = params.detach().flatten().numpy().reshape((-1, 1))
-        init_centroid_values = self.init_centroid_weights(flat_params, n_clusters, init_method)
-        max_iter = 1 if fast else 100
-        kmeans = MiniBatchKMeans(n_clusters, init=init_centroid_values, n_init=1, max_iter=max_iter, verbose=error_checking)
-        kmeans.fit(flat_params)
-        centroid_idxs = kmeans.predict(flat_params)
+        
+        if fast:
+            centroid_idxs = [[0] for _ in range(len(flat_params))]
+            centroid_table = torch.tensor(np.array([[0] for _ in range(n_clusters)]), dtype=torch.float32)
+        else:
+            init_centroid_values = self.init_centroid_weights(flat_params, n_clusters, init_method)
+            kmeans = MiniBatchKMeans(n_clusters, init=init_centroid_values, n_init=1, max_iter=100, verbose=error_checking)
+            kmeans.fit(flat_params)
+            centroid_idxs = kmeans.predict(flat_params)
+            centroid_table = torch.tensor(np.array([centroid for centroid in kmeans.cluster_centers_]), dtype=torch.float32)
+        
         q_params = torch.nn.Parameter(torch.tensor(centroid_idxs, dtype=torch.long).view(orig_shape), requires_grad=False)
-        centroid_table = torch.tensor(np.array([centroid for centroid in kmeans.cluster_centers_]), dtype=torch.float32)
         param_table = nn.Embedding.from_pretrained(centroid_table, freeze=False)
         
         if error_checking:
@@ -156,7 +161,7 @@ def quantize(model, num_centroids, error_checking=False, fast=False):
     for name, layer in model.named_children():
         if type(layer) == nn.Linear:
             print(name)
-            model.__dict__['_modules'][name] = QuantizedLayer(layer, num_centroids)
+            model.__dict__['_modules'][name] = QuantizedLayer(layer, num_centroids, fast=fast)
         else:
             layer_types = [type(l) for l in layer.modules()]
             if nn.Linear in layer_types:
