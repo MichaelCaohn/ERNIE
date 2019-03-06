@@ -74,8 +74,6 @@ class QuantizedLayer(nn.Module):
             min_weight, max_weight = np.min(weights).item() * 10, np.max(weights).item() * 10
             spacing = (max_weight - min_weight) / (num_clusters + 1)
             init_centroid_values = np.linspace(min_weight + spacing, max_weight - spacing, num_clusters) / 10
-        elif init_method == 'random' or init_method == 'k-means++':
-            return init_centroid_values
         else:
             raise ValueError('Initialize method {} for centroids is unsupported'.format(init_method))
         return init_centroid_values.reshape(-1, 1) # reshape for KMeans -- expects centroids, features
@@ -87,10 +85,12 @@ class QuantizedLayer(nn.Module):
             centroid_idxs = [[0] for _ in range(len(flat_params))]
             centroid_table = torch.tensor(np.array([[0] for _ in range(n_clusters)]), dtype=torch.float32)
         else:
-            init_centroid_values = self.init_centroid_weights(flat_params, n_clusters, init_method)
-            if init_centroid_values.size == 0:
+            # initialization method supported in scikitlearn KMeans
+            if init_method == 'random' or init_method == 'k-means++':
                 kmeans = MiniBatchKMeans(n_clusters, init=init_method, n_init=1, max_iter=100, verbose=error_checking)
+            # initialization method not in scikitlearn
             else:
+                init_centroid_values = self.init_centroid_weights(flat_params, n_clusters, init_method)
                 kmeans = MiniBatchKMeans(n_clusters, init=init_centroid_values, n_init=1, max_iter=100, verbose=error_checking)
             kmeans.fit(flat_params)
             centroid_idxs = kmeans.predict(flat_params)
