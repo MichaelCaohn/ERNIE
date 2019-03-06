@@ -74,9 +74,10 @@ class QuantizedLayer(nn.Module):
             min_weight, max_weight = np.min(weights).item() * 10, np.max(weights).item() * 10
             spacing = (max_weight - min_weight) / (num_clusters + 1)
             init_centroid_values = np.linspace(min_weight + spacing, max_weight - spacing, num_clusters) / 10
+        elif init_method == 'random':
+            init_centroid_values = np.random.choice(weights, num_clusters, replace=False)
         else:
             raise ValueError('Initialize method {} for centroids is unsupported'.format(init_method))
-            
         return init_centroid_values.reshape(-1, 1) # reshape for KMeans -- expects centroids, features
         
     def quantize_params(self, params, n_clusters, init_method, error_checking=False, fast=False):
