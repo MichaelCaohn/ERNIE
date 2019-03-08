@@ -37,13 +37,14 @@ class QuantizedLayer(nn.Module):
             - these should be differentiable
             - nn.ParameterList() ? 
 
-        @param layer (nn.Module): Layer to apply quantization to
-        @param n_clusters (int): Number of clusters. log_2(n_clusters) is the size in bits of each 
+        Args:
+            layer (nn.Module): Layer to apply quantization to
+            n_clusters (int): Number of clusters. log_2(n_clusters) is the size in bits of each 
                                  cluster index.
-        @param init_method (String): Method to initialize the clusters. Currently only linear init,
+            init_method (String): Method to initialize the clusters. Currently only linear init,
                                      the method found to work best for quantization in Han et al. (2015),
                                      is implemented.
-        @param error_checking (bool): Flag for verbose K-means and error checking print statements.
+            error_checking (bool): Flag for verbose K-means and error checking print statements.
         """
         super(QuantizedLayer, self).__init__()
         
@@ -61,9 +62,10 @@ class QuantizedLayer(nn.Module):
         for instance, min weight, max weight, and then spaced num_centroid apart
         returns centroid mapped to value
 
-        @param weights (ndarray): Array of the weights in the layer to be compressed.
-        @param num_clusters (int): Number of clusters (see n_clusters in __init__)
-        @param init_method (String): Cluster initialization method (see init_method
+        Args:
+            weights (ndarray): Array of the weights in the layer to be compressed.
+            num_clusters (int): Number of clusters (see n_clusters in __init__)
+            init_method (String): Cluster initialization method (see init_method
                                      in __init__)
 
         @returns init_centroid_values (ndarray): Initial centroid values for K-means 
@@ -112,8 +114,9 @@ class QuantizedLayer(nn.Module):
         """
         - Somehow replace centroid locations in stored matrix with true centroid weights
         - If that doesn't work, construct PyTorch `Function` https://pytorch.org/docs/master/notes/extending.html
-
-        @param input_ (torch.Tensor): Input for the forward pass (x value)
+        
+        Args:
+            input_ (torch.Tensor): Input for the forward pass (x value)
 
         @returns out (torch.Tensor): Output of the model after run on the input
         """
@@ -127,9 +130,10 @@ def layer_check(model, numLin):
     """
     Checks that there are no linear layers in the quantized model, and checks that the number of 
     quantized layers is equal to the number of initial linear layers.
-
-    @param model (nn.Module): Quantized model
-    @param numLin (int): Number of linear layers in the original model
+    
+    Args:
+        model (nn.Module): Quantized model
+        numLin (int): Number of linear layers in the original model
     """
     numQuant = 0
     for l in model.modules():
@@ -149,9 +153,10 @@ def quantize(model, num_centroids, error_checking=False, fast=False):
     2. For each layer in the model
     
         2.a Replace the layer with a QuantizedLayer
-
-    @param model (nn.Module): Model to quantize
-    @param num_centroids (int): See n_clusters in QuantizedLayer().__init__()
+    
+    Args:
+        model (nn.Module): Model to quantize
+        num_centroids (int): See n_clusters in QuantizedLayer().__init__()
 
     @returns quantized_model (nn.Module): model with all layers quantized
     """
