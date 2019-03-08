@@ -21,5 +21,4 @@ pretrained_file_path = "../pretrained_transformer/transformer-ende-wmt-pyOnmt/av
 
 pretrained_model = torch.load(pretrained_file_path) # TODO - specify GPU for non-local run
 print(type(pretrained_model))
-pretrained_model.eval()
 
