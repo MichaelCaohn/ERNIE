@@ -57,8 +57,7 @@ class QuantizedLayer(nn.Module):
     
         
     def init_centroid_weights(self, weights, num_clusters, init_method):
-        """
-        computes initial centroid locations 
+        """ computes initial centroid locations 
         for instance, min weight, max weight, and then spaced num_centroid apart
         returns centroid mapped to value
 
@@ -67,9 +66,8 @@ class QuantizedLayer(nn.Module):
             num_clusters (int): Number of clusters (see n_clusters in __init__)
             init_method (String): Cluster initialization method (see init_method
                                      in __init__)
-
-        @returns init_centroid_values (ndarray): Initial centroid values for K-means 
-                                                 clustering algorithm.
+        Returns:
+            ndarray: Initial centroid values for K-means clustering algorithm.
         """
         init_centroid_values = []
         if init_method == 'linear':
@@ -81,6 +79,21 @@ class QuantizedLayer(nn.Module):
         return init_centroid_values.reshape(-1, 1) # reshape for KMeans -- expects centroids, features
         
     def quantize_params(self, params, n_clusters, init_method, error_checking=False, fast=False):
+    """ Uses k-means quantization to compress the passed in parameters.
+
+    Args: 
+        params (torch.Tensor): tensor of the weights to be quantized
+        n_clusters (int): Number of clusters (see n_clusters in __init__)
+        init_method (String): Cluster initialization method (see init_method in __init__)
+        error_checking (bool): Flag for verbose K-means and error checking print statements.
+        fast (bool): 
+
+    Returns:
+        (nn.Parameter, nn.Embedding)
+
+        * q_params: The quantized layer weights, which correspond to look up indices for the centroid table.
+        * param_table: The centroid table for looking up the weights.
+    """
         orig_shape = params.shape
         flat_params = params.detach().flatten().numpy().reshape((-1, 1))
         if fast:
@@ -118,7 +131,8 @@ class QuantizedLayer(nn.Module):
         Args:
             input_ (torch.Tensor): Input for the forward pass (x value)
 
-        @returns out (torch.Tensor): Output of the model after run on the input
+        Returns:
+            torch.Tensor: Output of the model after run on the input
         """
         orig_weight_shape, orig_bias_shape = self.weight.shape, self.bias.shape
         weights = self.weight_table(self.weight.flatten().long()).view(orig_weight_shape)
@@ -127,8 +141,7 @@ class QuantizedLayer(nn.Module):
         return out
      
 def layer_check(model, numLin):
-    """
-    Checks that there are no linear layers in the quantized model, and checks that the number of 
+    """ Checks that there are no linear layers in the quantized model, and checks that the number of 
     quantized layers is equal to the number of initial linear layers.
     
     Args:
@@ -158,7 +171,8 @@ def quantize(model, num_centroids, error_checking=False, fast=False):
         model (nn.Module): Model to quantize
         num_centroids (int): See n_clusters in QuantizedLayer().__init__()
 
-    @returns quantized_model (nn.Module): model with all layers quantized
+    Returns:
+        nn.Module: model with all layers quantized
     """
     if error_checking:
         num_linear = len([l for l in model.modules() if type(l) == nn.Linear])
