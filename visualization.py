@@ -11,17 +11,17 @@ from ernie import QuantizedLayer, layer_check, quantize
 
 def compareDistributions(arr1, arr2, path=None, show_fig=True, plot_title="linear initialization", 
 	arr1Title="Initial Centroids", arr2Title="Post K-means Centroids"):
-	"""
-	Graph for comparing distributions of two Numpy arrays. Used in this codebase to compare initial 
+	""" Graph for comparing distributions of two Numpy arrays. Used in this codebase to compare initial 
 	centroid values to those after kmeans is ran. Adapted from https://matplotlib.org/gallery/statistics/hist.html
-
-	@param arr1 (ndarray): 1d numpy array of floats, set to initial kmeans centroids in our code.
-	@param arr2 (ndarray): 1d numpy array of floats, set to post kmeans centroids in our code.
-	@param path (String): path to save graph
-	@param show_fig (bool): Flag to show figure.
-	@param plot_title (String): title of graph. Set to init method in our code.
-	@param arr1Title (String): title for first subplot.
-	@param arr2Title (String): title for second subplot.
+	
+	Args:
+		arr1 (ndarray): 1d numpy array of floats, set to initial kmeans centroids in our code.
+		arr2 (ndarray): 1d numpy array of floats, set to post kmeans centroids in our code.
+		path (String): path to save graph
+		show_fig (bool): Flag to show figure.
+		plot_title (String): title of graph. Set to init method in our code.
+		arr1Title (String): title for first subplot.
+		arr2Title (String): title for second subplot.
 	"""
 	figure, axs = plt.subplots(1, 2, tight_layout=True, sharey=True)
 	figure.suptitle(plot_title, fontsize=12, y=0.03)
@@ -54,11 +54,12 @@ def graphCDF(weights, path=None, title=None, show_fig=True, plot_title="Weights 
 	Graph for graphing CDF of the values in a numpy array. Used in this codebase to graph
 	CDF of weights of a layer. Adapted from https://matplotlib.org/examples/statistics/histogram_demo_cumulative.html
 
-	@param weights (ndarray): 1d numpy array of floats, set to weights of a layer in our code.
-	@param path (String): path to save graph
-	@param title (String): title of graph. Set to layer name in our code.
-	@param show_fig (bool): Flag to show figure.
-	@param plot_title (String): title of graph. Set to "Weights CDF Estimate" in our code.
+	Args:
+		weights (ndarray): 1d numpy array of floats, set to weights of a layer in our code.
+		path (String): path to save graph
+		title (String): title of graph. Set to layer name in our code.
+		show_fig (bool): Flag to show figure.
+		plot_title (String): title of graph. Set to "Weights CDF Estimate" in our code.
 	"""
 	figure, ax = plt.subplots(figsize=(8, 4))
 	figure.suptitle(plot_title, fontsize=12)
