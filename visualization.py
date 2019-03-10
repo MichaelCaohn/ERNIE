@@ -21,7 +21,8 @@ def compareDistributions(arr1, arr2, path=None, show_fig=True, plot_title="linea
 	figure, axs = plt.subplots(1, 2, tight_layout=True)#, sharey=True)
 	figure.suptitle(plot_title, fontsize=12, y=0.03)
 
-	N, bins, patches = axs[0].hist(arr1, bins='auto', density=True)
+	w = np.ones_like(arr1)/float(len(arr1))
+	N, bins, patches = axs[0].hist(arr1, density=False, weights=w)
 	axs[0].set_title(arr1Title)
 	fracs = N / N.max()
 	norm = colors.Normalize(fracs.min(), fracs.max())
@@ -32,7 +33,8 @@ def compareDistributions(arr1, arr2, path=None, show_fig=True, plot_title="linea
 
 	figure.subplots_adjust(hspace=0.5)
 
-	N_2, bins_2, patches_2 = axs[1].hist(arr2, bins='auto', density=True)
+	w_2 = np.ones_like(arr2)/float(len(arr2))
+	N_2, bins_2, patches_2 = axs[1].hist(arr2, density=False, weights=w_2)
 	axs[1].set_title(arr2Title)
 	fracs_2 = N_2 / N_2.max()
 	norm_2 = colors.Normalize(fracs_2.min(), fracs_2.max())
