@@ -186,22 +186,18 @@ class BinarizedLayer(nn.Module):
         return c1, c2
 
     def forward(self, input_):
-        shape = self.weights.shape
-        print(shape)
-        upper = max(self.c1.item(), self.c2.item())
-        lower = min(self.c1.item(), self.c2.item())
-        upper_t = torch.Tensor.new_full(shape, upper)
-        lower_t = torch.Tensor.new_full(shape, lower)
+        upper = self.c1 if self.c1 >= self.c2 else self.c2
+        lower = self.c1 if self.c1 < self.c2 else self.c2
         middle = upper-lower
-        w = torch.where(self.weights < middle, lower_t, upper_t)
-        #w = self.weights.clone()
+        w = self.weights.clone()
         #print("og weights: ", w)
-        #w[w<middle] = lower
-        #w[w>=middle] = upper
+        w[w<middle] = lower
+        w[w>=middle] = upper
         #print("new weights: ", w)
         bias = self.bias
         out = F.linear(input_, w, bias=bias)
         return out
+    
 def layer_check(model, numLin):
     """ Checks that there are no linear layers in the quantized model, and checks that the number of 
     quantized layers is equal to the number of initial linear layers.
