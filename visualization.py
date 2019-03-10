@@ -1,12 +1,7 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 from matplotlib import colors
-
-from ernie import QuantizedLayer, layer_check, quantize 
 
 
 def compareDistributions(arr1, arr2, path=None, show_fig=True, plot_title="linear initialization", 
