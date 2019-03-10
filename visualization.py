@@ -49,7 +49,7 @@ def compareDistributions(arr1, arr2, path=None, show_fig=True, plot_title="linea
 		figure.savefig(path)
 	if show_fig:
 		plt.show()
-def graphCDF(weights, path=None, title=None, show_fig=True, plot_title="Weights CDF Estimate"):
+def graphCDF(weights, path=None, title=None, show_fig=True, plot_title="Weights CDF Estimate", bins_factor=10):
 	"""
 	Graph for graphing CDF of the values in a numpy array. Used in this codebase to graph
 	CDF of weights of a layer. Adapted from https://matplotlib.org/examples/statistics/histogram_demo_cumulative.html
@@ -60,10 +60,11 @@ def graphCDF(weights, path=None, title=None, show_fig=True, plot_title="Weights 
 		title (String): title of graph. Set to layer name in our code.
 		show_fig (bool): Flag to show figure.
 		plot_title (String): title of graph. Set to "Weights CDF Estimate" in our code.
+		bins_factor (int): factor for the number of bins in the CDF histogram. More bins = less smooth curve.
 	"""
 	figure, ax = plt.subplots(figsize=(8, 4))
 	figure.suptitle(plot_title, fontsize=12)
-	num_bins = int(weights.size/10)
+	num_bins = int(weights.size/bins_factor)
 	ax.hist(weights, bins=num_bins, density=1, histtype='step', cumulative=True, label='weights')
 	if path:
 		figure.savefig(path)
