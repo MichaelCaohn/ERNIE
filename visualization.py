@@ -23,7 +23,7 @@ def compareDistributions(arr1, arr2, path=None, show_fig=True, plot_title="linea
 		arr1Title (String): title for first subplot.
 		arr2Title (String): title for second subplot.
 	"""
-	figure, axs = plt.subplots(1, 2, tight_layout=True, sharey=True)
+	figure, axs = plt.subplots(1, 2, tight_layout=True)#, sharey=True)
 	figure.suptitle(plot_title, fontsize=12, y=0.03)
 
 	N, bins, patches = axs[0].hist(arr1, bins='auto', density=True)
@@ -44,7 +44,8 @@ def compareDistributions(arr1, arr2, path=None, show_fig=True, plot_title="linea
 	for tf, tp in zip(fracs, patches):
 		color = plt.cm.winter(norm(tf))
 		tp.set_facecolor(color)
-	#axs[1].yaxis.set_major_formatter(PercentFormatter(xmax=1))
+	axs[1].yaxis.set_major_formatter(PercentFormatter(xmax=1))
+
 	if path: 
 		figure.savefig(path)
 	if show_fig:
@@ -71,7 +72,8 @@ def graphCDF(weights, path=None, title=None, show_fig=True, plot_title="Weights 
 	if show_fig:
 		plt.show()
 
-x = np.random.randn(500)
-y = np.random.randn(500)
-compareDistributions(x, y)
-graphCDF(x)
+if __name__=="__main__":
+	x = np.random.randn(500)
+	y = np.random.randn(500)
+	compareDistributions(x, y)
+	graphCDF(x)
