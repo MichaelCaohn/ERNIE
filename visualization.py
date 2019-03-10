@@ -32,13 +32,13 @@ def compareDistributions(arr1, arr2, path=None, show_fig=True, plot_title="linea
 
 	figure.subplots_adjust(hspace=0.5)
 
-	N, bins, patches = axs[1].hist(arr2, bins='auto', density=True)
+	N_2, bins_2, patches_2 = axs[1].hist(arr2, bins='auto', density=True)
 	axs[1].set_title(arr2Title)
-	fracs = N / N.max()
-	norm = colors.Normalize(fracs.min(), fracs.max())
-	for tf, tp in zip(fracs, patches):
-		color = plt.cm.winter(norm(tf))
-		tp.set_facecolor(color)
+	fracs_2 = N_2 / N_2.max()
+	norm_2 = colors.Normalize(fracs_2.min(), fracs_2.max())
+	for tf_2, tp_2 in zip(fracs_2, patches_2):
+		color_2 = plt.cm.winter(norm(tf_2))
+		tp_2.set_facecolor(color_2)
 	axs[1].yaxis.set_major_formatter(PercentFormatter(xmax=1))
 
 	if path: 
@@ -69,6 +69,6 @@ def graphCDF(weights, path=None, title=None, show_fig=True, plot_title="Weights 
 
 if __name__=="__main__":
 	x = np.random.randn(500)
-	y = np.random.randn(500)
+	y = np.random.randn(7000)
 	compareDistributions(x, y)
 	graphCDF(x)
