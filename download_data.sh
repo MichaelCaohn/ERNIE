@@ -8,3 +8,5 @@ python preprocess.py -train_src data/train.en -train_tgt data/train.de -valid_sr
 
 wget https://s3.amazonaws.com/opennmt-models/transformer-ende-wmt-pyOnmt.tar.gz
 tar xvzf transformer-ende-wmt-pyOnmt.tar.gz
+
+./sentencepiece-master/build/src/spm_decode --model sentencepiece.model --input_format piece < "data/valid.de" > "val.txt"
