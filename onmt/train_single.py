@@ -56,6 +56,7 @@ def main(opt, device_id):
         if opt.fine_tune:
             model_opt.learning_rate = opt.learning_rate
             model_opt.warmup_steps = opt.warmup_steps
+            model_opt.n_clusters = opt.n_clusters
         
         logger.info('Loading vocab from checkpoint at %s.' % opt.train_from)
         vocab = checkpoint['vocab']

@@ -18,8 +18,10 @@ from collections import OrderedDict
 from onmt.encoders.transformer import TransformerEncoderLayer, TransformerEncoder
 from onmt.modules.embeddings import PositionalEncoding
 
+from visualization import compareDistributions, graphCDF
+
 class QuantizedLayer(nn.Module):
-    def __init__(self, layer, n_clusters, init_method='linear', error_checking=False, fast=False):
+    def __init__(self, layer, n_clusters, init_method='linear', error_checking=False, name="", fast=False):
         """
         - Come up with initial centroid locations for the layer weights
 
@@ -48,10 +50,10 @@ class QuantizedLayer(nn.Module):
         """
         super(QuantizedLayer, self).__init__()
         
-        self.weight, self.weight_table = self.quantize_params(layer.weight, n_clusters, init_method, error_checking, fast)
+        self.weight, self.weight_table = self.quantize_params(layer.weight, n_clusters, init_method, error_checking, name, fast)
         
         if layer.bias is not None:
-            self.bias, self.bias_table = self.quantize_params(layer.bias, 2 ** 8, init_method, error_checking, fast)
+            self.bias, self.bias_table = self.quantize_params(layer.bias, 2 ** 8, init_method, error_checking, name, fast)
         else:
             self.bias = None
     
@@ -78,7 +80,7 @@ class QuantizedLayer(nn.Module):
             raise ValueError('Initialize method {} for centroids is unsupported'.format(init_method))
         return init_centroid_values.reshape(-1, 1) # reshape for KMeans -- expects centroids, features
         
-    def quantize_params(self, params, n_clusters, init_method, error_checking=False, fast=False):
+    def quantize_params(self, params, n_clusters, init_method, error_checking=False, name="", fast=False):
         """ Uses k-means quantization to compress the passed in parameters.
 
         Args: 
@@ -96,6 +98,7 @@ class QuantizedLayer(nn.Module):
         """
         orig_shape = params.shape
         flat_params = params.detach().flatten().numpy().reshape((-1, 1))
+        
         if fast:
             centroid_idxs = [[0] for _ in range(len(flat_params))]
             centroid_table = torch.tensor(np.array([[0] for _ in range(n_clusters)]), dtype=torch.float32)
@@ -110,6 +113,12 @@ class QuantizedLayer(nn.Module):
             kmeans.fit(flat_params)
             centroid_idxs = kmeans.predict(flat_params)
             centroid_table = torch.tensor(np.array([centroid for centroid in kmeans.cluster_centers_]), dtype=torch.float32)
+#         np.save("{}_init_cluster_centroids.npy".format(name), kmeans.cluster_centers_)
+#         compareDistributions(flat_params, 
+#                              np.array(kmeans.cluster_centers_), 
+#                              plot_title="{} Centroid Distributions".format(name),
+#                              path="distributions/{}_centroids.png".format(name), 
+#                              show_fig=True)
         
         q_params = nn.Parameter(torch.tensor(centroid_idxs, dtype=torch.long).view(orig_shape), requires_grad=False)
         param_table = nn.Embedding.from_pretrained(centroid_table, freeze=False)
@@ -209,7 +218,6 @@ def layer_check(model, numLin):
 def quantize(model, num_centroids, error_checking=False, fast=False):
     """
     1. Iterates through model layers forward
-    TODO - test backward
     
     2. For each layer in the model
     
@@ -231,7 +239,7 @@ def quantize(model, num_centroids, error_checking=False, fast=False):
     for name, layer in model.named_children():
         if type(layer) == nn.Linear:
             print(name)
-            model.__dict__['_modules'][name] = QuantizedLayer(layer, num_centroids, fast=fast)
+            model.__dict__['_modules'][name] = QuantizedLayer(layer, num_centroids, name=name, fast=fast)
         else:
             layer_types = [type(l) for l in layer.modules()]
             if nn.Linear in layer_types:

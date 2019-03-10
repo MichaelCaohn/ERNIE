@@ -239,6 +239,10 @@ class Optimizer(object):
             else:
                 ckpt_state_dict = optim
 
+            if opt.fine_tune:
+                ckpt_opt.learning_rate = opt.learning_rate
+                ckpt_opt.warmup_steps = opt.warmup_steps
+                
             if opt.reset_optim == 'none':
                 # Load everything from the checkpoint.
                 optim_opt = ckpt_opt
