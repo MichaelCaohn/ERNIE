@@ -79,21 +79,21 @@ class QuantizedLayer(nn.Module):
         return init_centroid_values.reshape(-1, 1) # reshape for KMeans -- expects centroids, features
         
     def quantize_params(self, params, n_clusters, init_method, error_checking=False, fast=False):
-    """ Uses k-means quantization to compress the passed in parameters.
+        """ Uses k-means quantization to compress the passed in parameters.
 
-    Args: 
-        params (torch.Tensor): tensor of the weights to be quantized
-        n_clusters (int): Number of clusters (see n_clusters in __init__)
-        init_method (String): Cluster initialization method (see init_method in __init__)
-        error_checking (bool): Flag for verbose K-means and error checking print statements.
-        fast (bool): 
+        Args: 
+            params (torch.Tensor): tensor of the weights to be quantized
+            n_clusters (int): Number of clusters (see n_clusters in __init__)
+            init_method (String): Cluster initialization method (see init_method in __init__)
+            error_checking (bool): Flag for verbose K-means and error checking print statements.
+            fast (bool): 
 
-    Returns:
-        (nn.Parameter, nn.Embedding)
+        Returns:
+            (nn.Parameter, nn.Embedding)
 
-        * q_params: The quantized layer weights, which correspond to look up indices for the centroid table.
-        * param_table: The centroid table for looking up the weights.
-    """
+            * q_params: The quantized layer weights, which correspond to look up indices for the centroid table.
+            * param_table: The centroid table for looking up the weights.
+        """
         orig_shape = params.shape
         flat_params = params.detach().flatten().numpy().reshape((-1, 1))
         if fast:
