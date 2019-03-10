@@ -156,7 +156,7 @@ class BinarizedLayer(nn.Module):
         self.weights = layer.weight
         self.centroids = self.binarize_params(layer.weight, init_method, error_checking)
         # TODO - implement bias
-        self.bias = None
+        self.bias = layer.bias
 
     def init_centroid_weights(self, weights, num_clusters, init_method):
         init_centroid_values = []
@@ -265,7 +265,7 @@ if __name__=="__main__":
     print("=" * 100)
     print("Input: ", input_)
     # commented this out because the q_layer line was yelling at me, can look at later
-    q_layer = QuantizedLayer(linear, "linear", error_checking=True)
+    q_layer = BinarizedLayer(linear, "linear", error_checking=True)
     L1_loss = nn.L1Loss(size_average=False)
     target = torch.tensor([1, -1], dtype=torch.float32)
     out = q_layer(input_)
