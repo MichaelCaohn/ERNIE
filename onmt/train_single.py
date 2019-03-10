@@ -53,6 +53,10 @@ def main(opt, device_id):
         model_opt = ArgumentParser.ckpt_model_opts(checkpoint["opt"])
         ArgumentParser.update_model_opts(model_opt)
         ArgumentParser.validate_model_opts(model_opt)
+        if opt.fine_tune:
+            model_opt.learning_rate = opt.learning_rate
+            model_opt.warmup_steps = opt.warmup_steps
+        
         logger.info('Loading vocab from checkpoint at %s.' % opt.train_from)
         vocab = checkpoint['vocab']
     else:
@@ -86,7 +90,6 @@ def main(opt, device_id):
     logger.info('decoder: %d' % dec)
     logger.info('* number of parameters: %d' % n_params)
     _check_save_model_path(opt)
-
     # Build optimizer.
     optim = Optimizer.from_opt(model, opt, checkpoint=checkpoint)
 
@@ -99,12 +102,13 @@ def main(opt, device_id):
     train_iter = build_dataset_iter("train", fields, opt)
     valid_iter = build_dataset_iter(
         "valid", fields, opt, is_train=False)
-
+    
     if len(opt.gpu_ranks):
         logger.info('Starting training on GPU: %s' % opt.gpu_ranks)
     else:
         logger.info('Starting training on CPU, could be very slow')
     train_steps = opt.train_steps
+
     if opt.single_pass and train_steps > 0:
         logger.warning("Option single_pass is enabled, ignoring train_steps.")
         train_steps = 0

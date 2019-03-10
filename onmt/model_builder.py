@@ -19,6 +19,7 @@ from onmt.utils.misc import use_gpu
 from onmt.utils.logging import logger
 from onmt.utils.parse import ArgumentParser
 
+from ernie import quantize
 
 def build_embeddings(opt, text_field, for_encoder=True):
     """
@@ -83,10 +84,12 @@ def load_test_model(opt, model_path=None):
         model_path = opt.models[0]
     checkpoint = torch.load(model_path,
                             map_location=lambda storage, loc: storage)
-
+    
+    
     model_opt = ArgumentParser.ckpt_model_opts(checkpoint['opt'])
     ArgumentParser.update_model_opts(model_opt)
     ArgumentParser.validate_model_opts(model_opt)
+    
     vocab = checkpoint['vocab']
     if inputters.old_style_vocab(vocab):
         fields = inputters.load_old_vocab(
@@ -96,7 +99,7 @@ def load_test_model(opt, model_path=None):
         fields = vocab
 
     model = build_base_model(model_opt, fields, use_gpu(opt), checkpoint,
-                             opt.gpu)
+                             opt.gpu, from_quantized=opt.from_quantized)
     if opt.fp32:
         model.float()
     model.eval()
@@ -104,7 +107,7 @@ def load_test_model(opt, model_path=None):
     return fields, model, model_opt
 
 
-def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
+def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None, from_quantized=False):
     """Build a model from opts.
 
     Args:
@@ -121,7 +124,7 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
     Returns:
         the NMTModel.
     """
-
+    print(vars(model_opt))
     # Build embeddings.
     if model_opt.model_type == "text":
         src_field = fields["src"]
@@ -188,8 +191,13 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
         checkpoint['model'] = {fix_key(k): v
                                for k, v in checkpoint['model'].items()}
         # end of patch for backward compatibility
-
+        if from_quantized:
+            print("LOADING A QUANTIZED MODEL IN")
+            model = quantize(model, 2 ** model_opt.n_clusters, fast=True)
+            print(model.encoder.transformer[0].self_attn.linear_keys.weight)
         model.load_state_dict(checkpoint['model'], strict=False)
+        print(model.encoder.transformer[0].self_attn.linear_keys.weight)
+            
         generator.load_state_dict(checkpoint['generator'], strict=False)
     else:
         if model_opt.param_init != 0.0:
@@ -211,7 +219,9 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
         if hasattr(model.decoder, 'embeddings'):
             model.decoder.embeddings.load_pretrained_vectors(
                 model_opt.pre_word_vecs_dec)
-
+    
+    if not model_opt.from_quantized:
+        quantize(model, 2 ** model_opt.n_clusters)
     model.generator = generator
     model.to(device)
     if model_opt.model_dtype == 'fp16':
