@@ -151,7 +151,7 @@ class QuantizedLayer(nn.Module):
 
 class BinarizedLayer(nn.Module):
 
-    def __init__(self, layer, init_method='linear', error_checking=False):
+    def __init__(self, layer, n_clusters, init_method='linear', error_checking=False, name="", fast=False):
         super(BinarizedLayer, self).__init__()
         self.weights = layer.weight
         self.c1, self.c2 = self.binarize_params(layer.weight, init_method, error_checking)
@@ -243,7 +243,7 @@ def quantize(model, num_centroids, error_checking=False, fast=False):
     for name, layer in model.named_children():
         if type(layer) == nn.Linear:
             print(name)
-            model.__dict__['_modules'][name] = QuantizedLayer(layer, num_centroids, name=name, fast=fast)
+            model.__dict__['_modules'][name] = BinarizedLayer(layer, num_centroids, name=name, fast=fast)
         else:
             layer_types = [type(l) for l in layer.modules()]
             if nn.Linear in layer_types:
