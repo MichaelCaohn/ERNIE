@@ -111,7 +111,7 @@ class QuantizedLayer(nn.Module):
             centroid_idxs = kmeans.predict(flat_params)
             centroid_table = torch.tensor(np.array([centroid for centroid in kmeans.cluster_centers_]), dtype=torch.float32)
         
-        q_params = torch.nn.Parameter(torch.tensor(centroid_idxs, dtype=torch.long).view(orig_shape), requires_grad=False)
+        q_params = nn.Parameter(torch.tensor(centroid_idxs, dtype=torch.long).view(orig_shape), requires_grad=False)
         param_table = nn.Embedding.from_pretrained(centroid_table, freeze=False)
         
         if error_checking:
@@ -144,16 +144,50 @@ class BinarizedLayer(nn.Module):
 
     def __init__(self, layer, init_method='linear', error_checking=False):
         super(BinarizedLayer, self).__init__()
-        self.weight, self.weight_table = self.binarize_params(layer.weight, init_method, error_checking)
+        self.weights = layer.weight
+        self.centroids = self.binarize_params(layer.weight, init_method, error_checking)
         # TODO - implement bias
         self.bias = None
 
+    def init_centroid_weights(self, weights, num_clusters, init_method):
+        init_centroid_values = []
+        if init_method == 'linear':
+            min_weight, max_weight = np.min(weights).item() * 10, np.max(weights).item() * 10
+            spacing = (max_weight - min_weight) / (num_clusters + 1)
+            init_centroid_values = np.linspace(min_weight + spacing, max_weight - spacing, num_clusters) / 10
+        else:
+            raise ValueError('Initialize method {} for centroids is unsupported'.format(init_method))
+        return init_centroid_values.reshape(-1, 1) # reshape for KMeans -- expects centroids, features
+
     def binarize_params(self, params, init_method, error_checking):
-        
+        flat_params = params.detach().flatten().numpy().reshape((-1, 1))        
+        if init_method == 'random' or init_method == 'k-means++':
+            kmeans = MiniBatchKMeans(2, init=init_method, n_init=1, max_iter=100, verbose=error_checking)
+        else:
+            init_centroid_values = self.init_centroid_weights(flat_params, 2, init_method)
+            kmeans = MiniBatchKMeans(2, init=init_centroid_values, n_init=1, max_iter=100, verbose=error_checking)
+        kmeans.fit(flat_params)
+        centroids = nn.Parameter(torch.tensor(np.array([centroid for centroid in kmeans.cluster_centers_]), dtype=torch.float32))
+        if error_checking:
+            print("Layer weights: ", params)
+            print("Initialization method: ", init_method)
+            print("Init centroid values: ", init_centroid_values)
+            print("Centroids: ", centroids)
+            print("Indexed: ", centroids[0].item(), centroids[1].item())
+        return centroids
 
     def forward(self, input_):
-
-     
+        upper = max(self.centroids[0].item(), self.centroids[1].item())
+        lower = min(self.centroids[0].item(), self.centroids[1].item())
+        middle = upper-lower
+        w = self.weights.clone()
+        #print("og weights: ", w)
+        w[w<middle] = lower
+        w[w>=middle] = upper
+        #print("new weights: ", w)
+        bias = self.bias
+        out = F.linear(input_, w, bias=bias)
+        return out
 def layer_check(model, numLin):
     """ Checks that there are no linear layers in the quantized model, and checks that the number of 
     quantized layers is equal to the number of initial linear layers.
@@ -223,7 +257,7 @@ if __name__=="__main__":
     print("=" * 100)
     print("Input: ", input_)
     # commented this out because the q_layer line was yelling at me, can look at later
-    q_layer = QuantizedLayer(linear, 2, "linear", error_checking=True)
+    q_layer = QuantizedLayer(linear, "linear", error_checking=True)
     L1_loss = nn.L1Loss(size_average=False)
     target = torch.tensor([1, -1], dtype=torch.float32)
     out = q_layer(input_)
