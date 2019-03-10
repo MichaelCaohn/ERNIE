@@ -221,6 +221,7 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None, from_
                 model_opt.pre_word_vecs_dec)
     
     if not model_opt.from_quantized:
+        print(model_opt.n_clusters)
         quantize(model, 2 ** model_opt.n_clusters)
     model.generator = generator
     model.to(device)
