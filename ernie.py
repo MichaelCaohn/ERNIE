@@ -139,6 +139,20 @@ class QuantizedLayer(nn.Module):
         bias = self.bias_table(self.bias.flatten().long()).view(orig_bias_shape) if self.bias is not None else None
         out = F.linear(input_, weights, bias=bias)
         return out
+
+class BinarizedLayer(nn.Module):
+
+    def __init__(self, layer, init_method='linear', error_checking=False):
+        super(BinarizedLayer, self).__init__()
+        self.weight, self.weight_table = self.binarize_params(layer.weight, init_method, error_checking)
+        # TODO - implement bias
+        self.bias = None
+
+    def binarize_params(self, params, init_method, error_checking):
+        
+
+    def forward(self, input_):
+
      
 def layer_check(model, numLin):
     """ Checks that there are no linear layers in the quantized model, and checks that the number of 
