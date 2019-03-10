@@ -154,7 +154,7 @@ class BinarizedLayer(nn.Module):
     def __init__(self, layer, init_method='linear', error_checking=False):
         super(BinarizedLayer, self).__init__()
         self.weights = layer.weight
-        self.centroids = self.binarize_params(layer.weight, init_method, error_checking)
+        self.c1, self.c2 = self.binarize_params(layer.weight, init_method, error_checking)
         # TODO - implement bias
         self.bias = layer.bias
 
@@ -176,23 +176,28 @@ class BinarizedLayer(nn.Module):
             init_centroid_values = self.init_centroid_weights(flat_params, 2, init_method)
             kmeans = MiniBatchKMeans(2, init=init_centroid_values, n_init=1, max_iter=100, verbose=error_checking)
         kmeans.fit(flat_params)
-        centroids = nn.Parameter(torch.tensor(np.array([centroid for centroid in kmeans.cluster_centers_]), dtype=torch.float32))
+        c1 = nn.Parameter(torch.tensor(kmeans.cluster_centers_[0], dtype=torch.float32))
+        c2 = nn.Parameter(torch.tensor(kmeans.cluster_centers_[1], dtype=torch.float32))
         if error_checking:
             print("Layer weights: ", params)
             print("Initialization method: ", init_method)
             print("Init centroid values: ", init_centroid_values)
-            print("Centroids: ", centroids)
-            print("Indexed: ", centroids[0].item(), centroids[1].item())
-        return centroids
+            print("Centroids: ", c1, c2)
+        return c1, c2
 
     def forward(self, input_):
-        upper = max(self.centroids[0].item(), self.centroids[1].item())
-        lower = min(self.centroids[0].item(), self.centroids[1].item())
+        shape = self.weights.shape
+        print(shape)
+        upper = max(self.c1.item(), self.c2.item())
+        lower = min(self.c1.item(), self.c2.item())
+        upper_t = torch.Tensor.new_full(shape, upper)
+        lower_t = torch.Tensor.new_full(shape, lower)
         middle = upper-lower
-        w = self.weights.clone()
+        w = torch.where(self.weights < middle, lower_t, upper_t)
+        #w = self.weights.clone()
         #print("og weights: ", w)
-        w[w<middle] = lower
-        w[w>=middle] = upper
+        #w[w<middle] = lower
+        #w[w>=middle] = upper
         #print("new weights: ", w)
         bias = self.bias
         out = F.linear(input_, w, bias=bias)
@@ -206,14 +211,17 @@ def layer_check(model, numLin):
         numLin (int): Number of linear layers in the original model
     """
     numQuant = 0
+    numBin = 0
     for l in model.modules():
         if type(l) == nn.Linear:  
             raise ValueError('There should not be any linear layers in a quantized model: {}'.format(model))
         if type(l) == QuantizedLayer:
             numQuant += 1
-    if numQuant != numLin:
-        raise ValueError('The number of quantized layers ({}) should be equal to the number of linear layers ({})'.format(
-            numQuant, numLin))
+        if type(l) == BinarizedLayer:
+            numBin += 1
+    if (numQuant+numBin) != numLin:
+        raise ValueError('The number of quantized layers ({}) plus the number of binarized layers ({}) should be equal to the number of linear layers ({})'.format(
+            numQuant, numBin, numLin))
         
 def quantize(model, num_centroids, error_checking=False, fast=False):
     """
@@ -266,6 +274,8 @@ if __name__=="__main__":
     print("Input: ", input_)
     # commented this out because the q_layer line was yelling at me, can look at later
     q_layer = BinarizedLayer(linear, "linear", error_checking=True)
+    print("centroid 1: ", q_layer.c1)
+    print("centroid 2: ", q_layer.c2)
     L1_loss = nn.L1Loss(size_average=False)
     target = torch.tensor([1, -1], dtype=torch.float32)
     out = q_layer(input_)
@@ -274,10 +284,13 @@ if __name__=="__main__":
     print("loss: ", loss)
     q_layer.zero_grad()
     loss.backward()
-    print(q_layer.weight_table.weight.grad)
-    for f in q_layer.weight_table.parameters():
+    print(q_layer.c1.grad)
+    #print(q_layer.c1)
+    for f in q_layer.parameters():
         f.data.sub_(f.grad.data * 1)
-    print(q_layer.weight_table.weight)
+    #print(q_layer.weight_table.weight)
+    print("centroid 1: ", q_layer.c1)
+    print("centroid 2: ", q_layer.c2)
     print("quantization test: ")
     print(quantize(nn.Sequential(linear), 2, error_checking=True))
     print("=" * 100)
