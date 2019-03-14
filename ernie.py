@@ -49,10 +49,11 @@ class QuantizedLayer(nn.Module):
             error_checking (bool): Flag for verbose K-means and error checking print statements.
         """
         super(QuantizedLayer, self).__init__()
+        self.pruned = type(layer) == PrunedLayer
         
         self.weight, self.weight_table = self.quantize_params(layer.weight, n_clusters, init_method, error_checking, name, fast)
         
-        if layer.bias is not None:
+        if layer.bias is not None: # TODO - add check to make sure 2 ** 8 isn't more clusters than layer.bias.numel()
             self.bias, self.bias_table = self.quantize_params(layer.bias, 2 ** 8, init_method, error_checking, name, fast)
         else:
             self.bias = None
@@ -151,8 +152,12 @@ class QuantizedLayer(nn.Module):
 
 class BinarizedLayer(nn.Module):
 
-    def __init__(self, layer, n_clusters, init_method='linear', error_checking=False, name="", fast=False):
+    def __init__(self, layer, n_clusters=2, init_method='linear', error_checking=False, name="", fast=False):
         super(BinarizedLayer, self).__init__()
+        self.pruned = False
+        if type(layer) == PrunedLayer:
+            self.pruned = True
+            self.mask = layer.mask
         self.weights = layer.weight
         self.c1, self.c2 = self.binarize_params(layer.weight, init_method, error_checking)
         # TODO - implement bias
@@ -169,7 +174,13 @@ class BinarizedLayer(nn.Module):
         return init_centroid_values.reshape(-1, 1) # reshape for KMeans -- expects centroids, features
 
     def binarize_params(self, params, init_method, error_checking):
-        flat_params = params.detach().flatten().numpy().reshape((-1, 1))        
+        if self.pruned:
+            w = params * self.mask
+            w_flat = w.detach().flatten()
+            flat_params = w_flat[w_flat.nonzero()].flatten().numpy().reshape((-1, 1))
+        else:
+            flat_params = params.detach().flatten().numpy().reshape((-1, 1))  
+
         if init_method == 'random' or init_method == 'k-means++':
             kmeans = MiniBatchKMeans(2, init=init_method, n_init=1, max_iter=100, verbose=error_checking)
         else:
@@ -190,14 +201,47 @@ class BinarizedLayer(nn.Module):
         lower = self.c1 if self.c1 < self.c2 else self.c2
         middle = upper-lower
         w = self.weights.clone()
-        #print("og weights: ", w)
-        w[w<middle] = lower
-        w[w>=middle] = upper
-        #print("new weights: ", w)
+        if self.pruned:
+            w = w * self.mask
+            w[(w < middle) & (w != 0)] = lower
+            w[(w >= middle) & (w != 0)] = upper
+        else:
+            #print("orig weights: ", w)
+            w[w<middle] = lower
+            w[w>=middle] = upper
+            #print("new weights: ", w)
         bias = self.bias
         out = F.linear(input_, w, bias=bias)
         return out
+
+class PrunedLayer(nn.Module):
+    def __init__(self, layer, prop=0.1):
+        """ Implements class-uniform magnitude pruning, ie, prunes x% from the layer passed in
+        prop - proportion to prune (eg 0.1 = 10% pruning)
+        """
+        super(PrunedLayer, self).__init__()
+        self.weight = layer.weight
+        self.mask = self.prune(layer.weight, prop)
+        self.bias = layer.bias
+
+    def prune(self, params, prop):
+        # Technically may prune more than prop if there are multiple of the same weight
+        k = int(prop*params.numel())
+        shape = params.shape
+        absv = params.abs()
+        tk, idxs = torch.topk(absv.flatten(), k, largest=False, sorted=True)
+        threshold = tk[tk.numel()-1].item()
+        ones = torch.ones(shape)
+        zeros = torch.zeros(shape)
+        mask = torch.where(absv > threshold, ones, zeros)
+        #indices = [(x // shape[1], x % shape[1]) for x in idxs.tolist()]
+        return mask
     
+    def forward(self, input_):
+        w = self.weight * self.mask
+        bias = self.bias
+        out = F.linear(input_, w, bias=bias)
+        return out
 def layer_check(model, numLin):
     """ Checks that there are no linear layers in the quantized model, and checks that the number of 
     quantized layers is equal to the number of initial linear layers.
@@ -254,6 +298,18 @@ def quantize(model, num_centroids, error_checking=False, fast=False):
         
     return model
 
+def pruning(model, proportion=0.05):
+    for name, layer in model.named_children():
+        if type(layer) == nn.Linear:
+            print(name)
+            model.__dict__['_modules'][name] = PrunedLayer(layer, proportion)
+        else:
+            layer_types = [type(l) for l in layer.modules()]
+            if nn.Linear in layer_types:
+                pruning(layer, proportion)
+    print(model)
+    return model
+
 if __name__=="__main__":
     """ Unit test for quantization
     
@@ -262,31 +318,37 @@ if __name__=="__main__":
     Tests whether saving works
     
     """
-    linear = nn.Linear(2, 2)
+    linear = nn.Linear(2, 2, bias=False)
     linear.weight = torch.nn.Parameter(torch.tensor([[0, 0], [1, 3]], dtype=torch.float32))
-    linear.bias = torch.nn.Parameter(torch.tensor([1, 2], dtype=torch.float32))
+    #linear.bias = torch.nn.Parameter(torch.tensor([1, 2], dtype=torch.float32))
     input_ = torch.tensor([2, 1], dtype=torch.float32)
     print("=" * 100)
     print("Input: ", input_)
     # commented this out because the q_layer line was yelling at me, can look at later
-    q_layer = BinarizedLayer(linear, "linear", error_checking=True)
-    print("centroid 1: ", q_layer.c1)
-    print("centroid 2: ", q_layer.c2)
+    b_layer = BinarizedLayer(linear)
+    print("centroid 1: ", b_layer.c1)
+    print("centroid 2: ", b_layer.c2)
+    q_layer = QuantizedLayer(linear, 2)
+    print("** quantized centroids ** ", q_layer.weight_table.weight)
     L1_loss = nn.L1Loss(size_average=False)
-    target = torch.tensor([1, -1], dtype=torch.float32)
-    out = q_layer(input_)
+    target = torch.tensor([-2, -1], dtype=torch.float32)
+    out = b_layer(input_)
     loss = sum(target- out)
     print("out: ", out)
     print("loss: ", loss)
-    q_layer.zero_grad()
+    b_layer.zero_grad()
     loss.backward()
-    print(q_layer.c1.grad)
+    print(b_layer.c1.grad)
     #print(q_layer.c1)
-    for f in q_layer.parameters():
+    for f in b_layer.parameters():
         f.data.sub_(f.grad.data * 1)
     #print(q_layer.weight_table.weight)
-    print("centroid 1: ", q_layer.c1)
-    print("centroid 2: ", q_layer.c2)
+    print("centroid 1: ", b_layer.c1)
+    print("centroid 2: ", b_layer.c2)
+    '''out = q_layer(input_)
+    loss = sum(target- out)
+    print("out: ", out)
+    print("loss: ", loss)#'''
     print("quantization test: ")
     print(quantize(nn.Sequential(linear), 2, error_checking=True))
     print("=" * 100)
@@ -303,3 +365,36 @@ if __name__=="__main__":
 
     q_transf = quantize(transf, 2, error_checking=False)
     print(q_transf)
+    print("=" * 100)
+    print("Pruning test: ")
+    linear = nn.Linear(4, 4, bias=False)
+    print("Weights of linear layer: ", linear.weight)
+    prune = PrunedLayer(linear, 0.25)
+    print("Weights of pruned layer: ", prune.weight * prune.mask)
+    input_p = torch.tensor([3, 6, 2, 1], dtype=torch.float32)
+    target_p = torch.tensor([-3, -6, -2, -1], dtype=torch.float32)
+    out_p = prune(input_p)
+    loss_p = sum(target_p - out_p)
+    print("out: ", out_p)
+    print("loss: ", loss_p)
+    prune.zero_grad()
+    loss_p.backward()
+    print(prune.weight.grad)
+    print(prune.mask.grad)
+    for f in prune.parameters():
+        f.data.sub_(f.grad.data * 1)
+    print("new weights: ", prune.weight * prune.mask)
+    print("new output: ", prune(input_p))
+    pq_layer = BinarizedLayer(prune, 2)
+    print(pq_layer.pruned)
+    print("binarized centroids: ", pq_layer.c1, pq_layer.c2)
+    print("=" * 100)
+    print("bigger pruning test: ")
+    bigger_model = nn.Sequential(nn.Linear(3, 3), 
+                                nn.Linear(2, 2), 
+                                nn.Sequential(nn.Linear(4, 3), nn.Sequential(nn.Linear(2, 2), nn.Linear(2, 2))))
+    pruned_model = pruning(bigger_model, 0.25)
+    print("Pruned model: ", pruned_model)
+    for n, l in pruned_model.named_children():
+        if type(l) == PrunedLayer:
+            print("Weights: ", l.weight * l.mask)

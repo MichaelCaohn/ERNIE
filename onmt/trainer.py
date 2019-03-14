@@ -186,6 +186,7 @@ class Trainer(object):
         self._start_report_manager(start_time=total_stats.start_time)
 
         if self.n_gpu > 1:
+            print("more than 1 gpu")
             train_iter = itertools.islice(
                 train_iter, self.gpu_rank, None, self.n_gpu)
 
