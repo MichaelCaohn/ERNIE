@@ -307,6 +307,7 @@ def pruning(model, proportion=0.05):
             layer_types = [type(l) for l in layer.modules()]
             if nn.Linear in layer_types:
                 pruning(layer, proportion)
+    print(model)
     return model
 
 if __name__=="__main__":
