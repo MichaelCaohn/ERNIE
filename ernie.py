@@ -49,10 +49,11 @@ class QuantizedLayer(nn.Module):
             error_checking (bool): Flag for verbose K-means and error checking print statements.
         """
         super(QuantizedLayer, self).__init__()
+        self.pruned = type(layer) == PrunedLayer
         
         self.weight, self.weight_table = self.quantize_params(layer.weight, n_clusters, init_method, error_checking, name, fast)
         
-        if layer.bias is not None:
+        if layer.bias is not None: # TODO - add check to make sure 2 ** 8 isn't more clusters than layer.bias.numel()
             self.bias, self.bias_table = self.quantize_params(layer.bias, 2 ** 8, init_method, error_checking, name, fast)
         else:
             self.bias = None
@@ -337,3 +338,25 @@ if __name__=="__main__":
 
     q_transf = quantize(transf, 2, error_checking=False)
     print(q_transf)
+    print("=" * 100)
+    print("Pruning test: ")
+    linear = nn.Linear(4, 4, bias=False)
+    print("Weights of linear layer: ", linear.weight)
+    prune = PrunedLayer(linear, 0.25)
+    print("Weights of pruned layer: ", prune.weight * prune.mask)
+    input_p = torch.tensor([3, 6, 2, 1], dtype=torch.float32)
+    target_p = torch.tensor([-3, -6, -2, -1], dtype=torch.float32)
+    out_p = prune(input_p)
+    loss_p = sum(target_p - out_p)
+    print("out: ", out_p)
+    print("loss: ", loss_p)
+    prune.zero_grad()
+    loss_p.backward()
+    print(prune.weight.grad)
+    print(prune.mask.grad)
+    for f in prune.parameters():
+        f.data.sub_(f.grad.data * 1)
+    print("new weights: ", prune.weight * prune.mask)
+    print("new output: ", prune(input_p))
+    pq_layer = QuantizedLayer(prune, 2)
+    print(pq_layer.pruned)
