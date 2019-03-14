@@ -298,6 +298,17 @@ def quantize(model, num_centroids, error_checking=False, fast=False):
         
     return model
 
+def pruning(model, proportion):
+    for name, layer in model.named_children():
+        if type(layer) == nn.Linear:
+            print(name)
+            model.__dict__['_modules'][name] = PrunedLayer(layer, proportion)
+        else:
+            layer_types = [type(l) for l in layer.modules()]
+            if nn.Linear in layer_types:
+                pruning(layer, proportion)
+    return model
+
 if __name__=="__main__":
     """ Unit test for quantization
     
@@ -373,5 +384,16 @@ if __name__=="__main__":
         f.data.sub_(f.grad.data * 1)
     print("new weights: ", prune.weight * prune.mask)
     print("new output: ", prune(input_p))
-    pq_layer = QuantizedLayer(prune, 2)
+    pq_layer = BinarizedLayer(prune, 2)
     print(pq_layer.pruned)
+    print("binarized centroids: ", pq_layer.c1, pq_layer.c2)
+    print("=" * 100)
+    print("bigger pruning test: ")
+    bigger_model = nn.Sequential(nn.Linear(3, 3), 
+                                nn.Linear(2, 2), 
+                                nn.Sequential(nn.Linear(4, 3), nn.Sequential(nn.Linear(2, 2), nn.Linear(2, 2))))
+    pruned_model = pruning(bigger_model, 0.25)
+    print("Pruned model: ", pruned_model)
+    for n, l in pruned_model.named_children():
+        if type(l) == PrunedLayer:
+            print("Weights: ", l.weight * l.mask)
