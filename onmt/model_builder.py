@@ -19,7 +19,7 @@ from onmt.utils.misc import use_gpu
 from onmt.utils.logging import logger
 from onmt.utils.parse import ArgumentParser
 
-from ernie import quantize
+from ernie import quantize, pruning
 
 def build_embeddings(opt, text_field, for_encoder=True):
     """
@@ -222,7 +222,8 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None, from_
     
     if not model_opt.from_quantized:
         print(model_opt.n_clusters)
-        quantize(model, 2 ** model_opt.n_clusters)
+        #quantize(model, 2 ** model_opt.n_clusters)
+        pruning(model)
     model.generator = generator
     model.to(device)
     if model_opt.model_dtype == 'fp16':
