@@ -154,6 +154,9 @@ class BinarizedLayer(nn.Module):
 
     def __init__(self, layer, n_clusters=2, init_method='linear', error_checking=False, name="", fast=False):
         super(BinarizedLayer, self).__init__()
+        if type(layer) == PrunedLayer:
+            self.pruned = True
+            self.mask = layer.mask
         self.weights = layer.weight
         self.c1, self.c2 = self.binarize_params(layer.weight, init_method, error_checking)
         # TODO - implement bias
@@ -170,7 +173,13 @@ class BinarizedLayer(nn.Module):
         return init_centroid_values.reshape(-1, 1) # reshape for KMeans -- expects centroids, features
 
     def binarize_params(self, params, init_method, error_checking):
-        flat_params = params.detach().flatten().numpy().reshape((-1, 1))        
+        if self.pruned:
+            w = params * self.mask
+            w_flat = w.detach().flatten()
+            flat_params = w_flat[w_flat.nonzero()].flatten().numpy().reshape((-1, 1))
+        else:
+            flat_params = params.detach().flatten().numpy().reshape((-1, 1))  
+
         if init_method == 'random' or init_method == 'k-means++':
             kmeans = MiniBatchKMeans(2, init=init_method, n_init=1, max_iter=100, verbose=error_checking)
         else:
@@ -191,10 +200,15 @@ class BinarizedLayer(nn.Module):
         lower = self.c1 if self.c1 < self.c2 else self.c2
         middle = upper-lower
         w = self.weights.clone()
-        #print("og weights: ", w)
-        w[w<middle] = lower
-        w[w>=middle] = upper
-        #print("new weights: ", w)
+        if self.pruned:
+            w = w * self.mask
+            w[(w < middle) & (w != 0)] = lower
+            w[(w >= middle) & (w != 0)] = upper
+        else:
+            #print("orig weights: ", w)
+            w[w<middle] = lower
+            w[w>=middle] = upper
+            #print("new weights: ", w)
         bias = self.bias
         out = F.linear(input_, w, bias=bias)
         return out
