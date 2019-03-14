@@ -154,6 +154,7 @@ class BinarizedLayer(nn.Module):
 
     def __init__(self, layer, n_clusters=2, init_method='linear', error_checking=False, name="", fast=False):
         super(BinarizedLayer, self).__init__()
+        self.pruned = False
         if type(layer) == PrunedLayer:
             self.pruned = True
             self.mask = layer.mask
