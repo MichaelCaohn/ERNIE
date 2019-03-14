@@ -68,7 +68,7 @@ class MultiHeadedAttention(nn.Module):
         self.final_linear = nn.Linear(model_dim, model_dim)
 
         self.max_relative_positions = max_relative_positions
-
+        self.attn = None
         if max_relative_positions > 0:
             vocab_size = max_relative_positions * 2 + 1
             self.relative_positions_embeddings = nn.Embedding(
@@ -201,8 +201,10 @@ class MultiHeadedAttention(nn.Module):
 
         # 3) Apply attention dropout and compute context vectors.
         attn = self.softmax(scores).to(query.dtype)
+        self.attn = attn
+#         print(self.attn.shape)
         drop_attn = self.dropout(attn)
-
+        
         context_original = torch.matmul(drop_attn, value)
 
         if self.max_relative_positions > 0 and type == "self":

@@ -15,6 +15,7 @@ import torch
 
 import onmt.utils
 from onmt.utils.logging import logger
+from datetime import datetime
 
 
 def build_trainer(opt, device_id, model, fields, optim, model_saver=None):
@@ -319,6 +320,7 @@ class Trainer(object):
                 bptt = True
 
                 # 3. Compute loss.
+                start_time = datetime.now()
                 loss, batch_stats = self.train_loss(
                     batch,
                     outputs,
@@ -327,13 +329,15 @@ class Trainer(object):
                     shard_size=self.shard_size,
                     trunc_start=j,
                     trunc_size=trunc_size)
-
+#                 print("elapsed time for inference: ", datetime.now() - start_time)
+                start_time = datetime.now()
                 if loss is not None:
                     self.optim.backward(loss)
 
+#                 print("elapsed time for backprop: ", datetime.now() - start_time)
                 total_stats.update(batch_stats)
                 report_stats.update(batch_stats)
-
+                start_time = datetime.now()
                 # 4. Update the parameters and statistics.
                 if self.grad_accum_count == 1:
                     # Multi GPU gradient gather
@@ -344,7 +348,7 @@ class Trainer(object):
                         onmt.utils.distributed.all_reduce_and_rescale_tensors(
                             grads, float(1))
                     self.optim.step()
-
+#                 print("elapsed time for param update: ", datetime.now() - start_time)
                 # If truncated, don't backprop fully.
                 # TO CHECK
                 # if dec_state is not None:
