@@ -151,7 +151,7 @@ class QuantizedLayer(nn.Module):
 
 class BinarizedLayer(nn.Module):
 
-    def __init__(self, layer, n_clusters, init_method='linear', error_checking=False, name="", fast=False):
+    def __init__(self, layer, n_clusters=2, init_method='linear', error_checking=False, name="", fast=False):
         super(BinarizedLayer, self).__init__()
         self.weights = layer.weight
         self.c1, self.c2 = self.binarize_params(layer.weight, init_method, error_checking)
@@ -197,7 +197,35 @@ class BinarizedLayer(nn.Module):
         bias = self.bias
         out = F.linear(input_, w, bias=bias)
         return out
+
+class PrunedLayer(nn.Module):
+    def __init__(self, layer, prop=0.1):
+        """ Implements class-uniform magnitude pruning, ie, prunes x% from the layer passed in
+        prop - proportion to prune (eg 0.1 = 10% pruning)
+        """
+        super(PrunedLayer, self).__init__()
+        self.weight = layer.weight
+        self.mask = self.prune(layer.weight, prop)
+        self.bias = layer.bias
+
+    def prune(self, params, prop):
+        # Technically may prune more than prop if there are multiple of the same weight
+        k = int(prop*params.numel())
+        shape = params.shape
+        absv = params.abs()
+        tk, idxs = torch.topk(absv.flatten(), k, largest=False, sorted=True)
+        threshold = tk[tk.numel()-1].item()
+        ones = torch.ones(shape)
+        zeros = torch.zeros(shape)
+        mask = torch.where(absv > threshold, ones, zeros)
+        #indices = [(x // shape[1], x % shape[1]) for x in idxs.tolist()]
+        return mask
     
+    def forward(self, input_):
+        w = self.weight * self.mask
+        bias = self.bias
+        out = F.linear(input_, w, bias=bias)
+        return out
 def layer_check(model, numLin):
     """ Checks that there are no linear layers in the quantized model, and checks that the number of 
     quantized layers is equal to the number of initial linear layers.
@@ -262,31 +290,33 @@ if __name__=="__main__":
     Tests whether saving works
     
     """
-    linear = nn.Linear(2, 2)
+    linear = nn.Linear(2, 2, bias=False)
     linear.weight = torch.nn.Parameter(torch.tensor([[0, 0], [1, 3]], dtype=torch.float32))
-    linear.bias = torch.nn.Parameter(torch.tensor([1, 2], dtype=torch.float32))
+    #linear.bias = torch.nn.Parameter(torch.tensor([1, 2], dtype=torch.float32))
     input_ = torch.tensor([2, 1], dtype=torch.float32)
     print("=" * 100)
     print("Input: ", input_)
     # commented this out because the q_layer line was yelling at me, can look at later
-    q_layer = BinarizedLayer(linear, "linear", error_checking=True)
-    print("centroid 1: ", q_layer.c1)
-    print("centroid 2: ", q_layer.c2)
+    b_layer = BinarizedLayer(linear)
+    print("centroid 1: ", b_layer.c1)
+    print("centroid 2: ", b_layer.c2)
+    q_layer = QuantizedLayer(linear, 2)
+    print("** quantized centroids ** ", q_layer.weight_table.weight)
     L1_loss = nn.L1Loss(size_average=False)
     target = torch.tensor([-2, -1], dtype=torch.float32)
-    out = q_layer(input_)
+    out = b_layer(input_)
     loss = sum(target- out)
     print("out: ", out)
     print("loss: ", loss)
-    q_layer.zero_grad()
+    b_layer.zero_grad()
     loss.backward()
-    print(q_layer.c1.grad)
+    print(b_layer.c1.grad)
     #print(q_layer.c1)
-    for f in q_layer.parameters():
+    for f in b_layer.parameters():
         f.data.sub_(f.grad.data * 1)
     #print(q_layer.weight_table.weight)
-    print("centroid 1: ", q_layer.c1)
-    print("centroid 2: ", q_layer.c2)
+    print("centroid 1: ", b_layer.c1)
+    print("centroid 2: ", b_layer.c2)
     '''out = q_layer(input_)
     loss = sum(target- out)
     print("out: ", out)
