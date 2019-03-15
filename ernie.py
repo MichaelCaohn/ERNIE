@@ -298,7 +298,7 @@ def quantize(model, num_centroids, error_checking=False, fast=False):
         
     return model
 
-def pruning(model, proportion=0.05):
+def pruning(model, proportion=0.05, full_model=True):
     for name, layer in model.named_children():
         if type(layer) == nn.Linear:
             print(name)
@@ -306,8 +306,9 @@ def pruning(model, proportion=0.05):
         else:
             layer_types = [type(l) for l in layer.modules()]
             if nn.Linear in layer_types:
-                pruning(layer, proportion)
-    print(model)
+                pruning(layer, proportion, full_model=False)
+    if full_model:
+        print(model)
     return model
 
 if __name__=="__main__":
