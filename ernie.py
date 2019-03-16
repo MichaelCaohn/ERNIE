@@ -229,16 +229,11 @@ class PrunedLayer(nn.Module):
     def prune(self, params, prop):
         # Technically may prune more than prop if there are multiple of the same weight
         k = int(prop*params.numel())
-        print("k = ", k)
-        print("prop = ", prop)
-        print("numel = ", params.numel())
         shape = params.shape
         absv = params.abs()
         flattened = absv.flatten()
         topk_tensor = flattened[flattened.nonzero()]
-        print("top tensor ", topk_tensor)
-        tk, idxs = torch.topk(topk_tensor, k, largest=False, sorted=True)
-        assert(False)
+        tk, idxs = torch.topk(topk_tensor.flatten(), k, largest=False, sorted=True)
         threshold = tk[tk.numel()-1].item()
         ones = torch.ones(shape)
         zeros = torch.zeros(shape)
