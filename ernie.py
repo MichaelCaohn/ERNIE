@@ -234,9 +234,11 @@ class PrunedLayer(nn.Module):
         print("numel = ", params.numel())
         shape = params.shape
         absv = params.abs()
-        topk_tensor = absv.flatten().nonzero()
+        flattened = absv.flatten()
+        topk_tensor = flattened[flattened.nonzero()]
         print("top tensor ", topk_tensor)
         tk, idxs = torch.topk(topk_tensor, k, largest=False, sorted=True)
+        assert(False)
         threshold = tk[tk.numel()-1].item()
         ones = torch.ones(shape)
         zeros = torch.zeros(shape)
