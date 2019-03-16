@@ -235,9 +235,9 @@ class PrunedLayer(nn.Module):
         zeros = torch.zeros(shape)
         mask = torch.where(absv > threshold, ones, zeros)
         #indices = [(x // shape[1], x % shape[1]) for x in idxs.tolist()]
-        if self.weight.is_cuda:
-            return mask.cuda(device=torch.device('cuda', self.weight.get_device()))
-        return mask
+        #if self.weight.is_cuda:
+        #    return mask.cuda(device=torch.device('cuda', self.weight.get_device()))
+        return mask.cuda()
     
     def forward(self, input_):
         print("type of weight tensor: ", type(self.weight))
