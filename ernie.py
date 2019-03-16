@@ -220,9 +220,9 @@ class PrunedLayer(nn.Module):
         prop - proportion to prune (eg 0.1 = 10% pruning)
         """
         super(PrunedLayer, self).__init__()
-        self.prop = prop/10
+        self.prop = 5
         self.weight = layer.weight
-        self.mask = self.prune(layer.weight, self.prop)
+        self.mask = self.prune(layer.weight, prop)
         self.bias = layer.bias
         self.counter = 0
 
@@ -314,7 +314,7 @@ def quantize(model, num_centroids, error_checking=False, fast=False):
         
     return model
 
-def pruning(model, proportion=0.6, full_model=True):
+def pruning(model, proportion=0.5, full_model=True):
     for name, layer in model.named_children():
         if type(layer) == nn.Linear:
             print(name)
