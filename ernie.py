@@ -238,6 +238,7 @@ class PrunedLayer(nn.Module):
         ones = torch.ones(shape)
         zeros = torch.zeros(shape)
         print("absv iscuda ", absv.is_cuda)
+        absv = absv.cpu()
         mask = torch.where(absv > threshold, ones, zeros)
         #indices = [(x // shape[1], x % shape[1]) for x in idxs.tolist()]
         #if self.weight.is_cuda:
@@ -254,7 +255,7 @@ class PrunedLayer(nn.Module):
         w = self.weight * self.mask
         bias = self.bias
         out = F.linear(input_, w, bias=bias)
-        if self.counter % 1001:
+        if self.counter % 1001 == 0 or True:
             print(self.counter)
             self.mask = self.prune(self.weight, self.prop)
         return out
