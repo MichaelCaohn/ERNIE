@@ -215,32 +215,48 @@ class BinarizedLayer(nn.Module):
         return out
 
 class PrunedLayer(nn.Module):
-    def __init__(self, layer, prop=0.1):
+    def __init__(self, layer, prop=0.1, num_iters=10000):
         """ Implements class-uniform magnitude pruning, ie, prunes x% from the layer passed in
         prop - proportion to prune (eg 0.1 = 10% pruning)
         """
         super(PrunedLayer, self).__init__()
+        self.prop = 5
         self.weight = layer.weight
         self.mask = self.prune(layer.weight, prop)
         self.bias = layer.bias
+        self.counter = 0
 
     def prune(self, params, prop):
         # Technically may prune more than prop if there are multiple of the same weight
         k = int(prop*params.numel())
         shape = params.shape
         absv = params.abs()
-        tk, idxs = torch.topk(absv.flatten(), k, largest=False, sorted=True)
+        flattened = absv.flatten()
+        topk_tensor = flattened[flattened.nonzero()]
+        tk, idxs = torch.topk(topk_tensor.flatten(), k, largest=False, sorted=True)
         threshold = tk[tk.numel()-1].item()
         ones = torch.ones(shape)
         zeros = torch.zeros(shape)
+        absv = absv.cpu()
         mask = torch.where(absv > threshold, ones, zeros)
         #indices = [(x // shape[1], x % shape[1]) for x in idxs.tolist()]
-        return mask
+        #if self.weight.is_cuda:
+        #    return mask.cuda(device=torch.device('cuda', self.weight.get_device()))
+        return mask.cuda()
     
     def forward(self, input_):
+        '''print("type of weight tensor: ", type(self.weight))
+        print("weight tensor on cuda: ", self.weight.is_cuda)
+        print("type of mask tensor: ", type(self.mask))
+        print("mask tensor on cuda: ", self.mask.is_cuda)
+        assert(False)'''
+        self.counter += 1
         w = self.weight * self.mask
         bias = self.bias
         out = F.linear(input_, w, bias=bias)
+        if self.counter % 1001 == 0:
+            print(self.counter)
+            self.mask = self.prune(self.weight, self.prop)
         return out
 def layer_check(model, numLin):
     """ Checks that there are no linear layers in the quantized model, and checks that the number of 
@@ -298,7 +314,7 @@ def quantize(model, num_centroids, error_checking=False, fast=False):
         
     return model
 
-def pruning(model, proportion=0.05):
+def pruning(model, proportion=0.5, full_model=True):
     for name, layer in model.named_children():
         if type(layer) == nn.Linear:
             print(name)
@@ -306,8 +322,9 @@ def pruning(model, proportion=0.05):
         else:
             layer_types = [type(l) for l in layer.modules()]
             if nn.Linear in layer_types:
-                pruning(layer, proportion)
-    print(model)
+                pruning(layer, proportion, full_model=False)
+    if full_model:
+        print(model)
     return model
 
 if __name__=="__main__":
