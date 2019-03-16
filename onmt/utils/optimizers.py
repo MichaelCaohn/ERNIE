@@ -259,6 +259,10 @@ class Optimizer(object):
                 # Reset options, keep optimizer.
                 optim_state_dict = ckpt_state_dict
 
+        print(optim_opt.learning_rate)
+        print(optim_opt)
+        print(optim_state_dict)
+#         assert False
         optimizer = cls(
             build_torch_optimizer(model, optim_opt),
             optim_opt.learning_rate,

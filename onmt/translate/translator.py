@@ -346,39 +346,33 @@ class Translator(object):
                 self.out_file.flush()
                 
                 if attn_vis:
-                    sent = trans.src_raw
+                    src = trans.src_raw
+                    pred = trans.pred_sents[0]
+                    pred.append("'</s>'")
+                    attns = trans.attns[0]
+                    attns = attns[:len(pred), :len(src)].data.cpu()
                     def draw(data, x, y, ax, title):
                         ax.set_title(title)
                         seaborn.heatmap(data, 
                                         xticklabels=x, square=True, yticklabels=y, vmin=0.0, vmax=1.0, 
                                         cbar=False, ax=ax)
-                        
-#                     for layer in range(0, 6, 2):
-#                         fig, axs = plt.subplots(1, 4, figsize=(8, 4))
-#                         print("Encoder Layer", layer + 1)
-#                         for h in range(4):
-#                             data = list(self.model.encoder.children())[1][layer].self_attn.attn.data.cpu()
-#                             data = data[i, h]
-#                             print(data.shape)
-#                             data = data[:len(sent), :len(sent)]
-#                             draw(data,
-#                                  sent, sent if h == 0 else [], ax = axs[h], title="Head {}".format(h))
-#                         plt.suptitle("Attention Distribution for Layer {}".format(layer), y=.8)
-#                         plt.show()
+                    # plots attention over inputs 
+                    seaborn.heatmap(attns,
+                                    xticklabels=src, square=True, yticklabels=pred, vmin=0.0, vmax=1.0, 
+                                    cbar=False)
                     
-                    for layer in range(1, 6, 2):
-                        fig, axs = plt.subplots(1, 4, figsize=(8, 4))
-                        print("Decoder Layer", layer + 1)
-#                         print(list(self.model.decoder.children()))
-#                         assert False
+                    plt.show()
+
+                    for layer in range(0, 6, 2):
+                        fig, axs = plt.subplots(1, 4, figsize=(12, 6))
                         for h in range(4):
-                            data = list(self.model.decoder.children())[1][layer].self_attn.attn.data.cpu()
-                            print("data.shape", data.shape)
-                            assert False
-                            data = data[:len(sent), :len(sent)] 
+                            data = list(self.model.encoder.children())[1][layer].self_attn.attn.data.cpu()
+                            data = data[i, h]
+                            data = data[:len(src), :len(src)]
                             draw(data,
-                                 sent, sent if h == 0 else [], ax = axs[h], title="Head {}".format(h))
-                        plt.suptitle("Attention Distribution for Layer {}".format(layer), y=.8)
+                                 src, src if h == 0 else [], ax = axs[h], title="Head {}".format(h))
+#                         plt.suptitle("Attention Distribution for Layer {}".format(layer), y=.8)
+                        plt.show()
             
 
                 if self.verbose:
@@ -409,7 +403,6 @@ class Translator(object):
                         output += row_format.format(word, *row) + '\n'
                         row_format = "{:>10.10} " + "{:>10.7f} " * len(srcs)
                     os.write(1, output.encode('utf-8'))
-
         end_time = time.time()
 
         if self.report_score:
@@ -502,18 +495,8 @@ class Translator(object):
             block_ngram_repeat=self.block_ngram_repeat,
             exclusion_tokens=self._exclusion_idxs,
             memory_lengths=memory_lengths)
-
         for step in range(max_length):
-            print("step: ", step)
             decoder_input = beam.current_predictions.view(1, -1, 1)
-            for layer in range(1, 6, 2):
-                fig, axs = plt.subplots(1, 4, figsize=(8, 4))
-                print("Decoder Layer", layer + 1)
-#                         print(list(self.model.decoder.children()))
-#                         assert False
-                for h in range(4):
-                    data = list(self.model.decoder.children())[1][layer].self_attn.attn.data.cpu()
-                    print("data.shape", data.shape)
 
             log_probs, attn = self._decode_and_generate(
                 decoder_input,
@@ -524,7 +507,7 @@ class Translator(object):
                 src_map=src_map,
                 step=step,
                 batch_offset=beam._batch_offset)
-
+            
             beam.advance(log_probs, attn)
             any_beam_is_finished = beam.is_finished.any()
             if any_beam_is_finished:
