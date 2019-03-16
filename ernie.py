@@ -238,6 +238,8 @@ class PrunedLayer(nn.Module):
         return mask
     
     def forward(self, input_):
+        print("type of weight tensor: ", type(self.weight))
+        print("type of mask tensor: ", type(self.mask))
         w = self.weight * self.mask
         bias = self.bias
         out = F.linear(input_, w, bias=bias)
