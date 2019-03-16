@@ -240,11 +240,11 @@ class PrunedLayer(nn.Module):
         return mask.cuda()
     
     def forward(self, input_):
-        print("type of weight tensor: ", type(self.weight))
+        '''print("type of weight tensor: ", type(self.weight))
         print("weight tensor on cuda: ", self.weight.is_cuda)
         print("type of mask tensor: ", type(self.mask))
         print("mask tensor on cuda: ", self.mask.is_cuda)
-        assert(False)
+        assert(False)'''
         w = self.weight * self.mask
         bias = self.bias
         out = F.linear(input_, w, bias=bias)
