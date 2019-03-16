@@ -220,19 +220,24 @@ class PrunedLayer(nn.Module):
         prop - proportion to prune (eg 0.1 = 10% pruning)
         """
         super(PrunedLayer, self).__init__()
-        self.prop = 5
+        self.prop = 0.05
         self.weight = layer.weight
         self.mask = self.prune(layer.weight, prop)
         self.bias = layer.bias
         self.counter = 0
 
-    def prune(self, params, prop):
+    def prune(self, params, prop, error_check=False):
         # Technically may prune more than prop if there are multiple of the same weight
         k = int(prop*params.numel())
         shape = params.shape
         absv = params.abs()
         flattened = absv.flatten()
         topk_tensor = flattened[flattened.nonzero()]
+        if error_check:
+            print("k = ", k)
+            print("shape = ", shape)
+            print("flattened = ", flattened)
+            print("topk_tensor_flat = ", topk_tensor.flatten()) 
         tk, idxs = torch.topk(topk_tensor.flatten(), k, largest=False, sorted=True)
         threshold = tk[tk.numel()-1].item()
         ones = torch.ones(shape)
@@ -256,7 +261,7 @@ class PrunedLayer(nn.Module):
         out = F.linear(input_, w, bias=bias)
         if self.counter % 1001 == 0:
             print(self.counter)
-            self.mask = self.prune(self.weight, self.prop)
+            self.mask = self.prune(self.weight, self.prop, error_check=True)
         return out
 def layer_check(model, numLin):
     """ Checks that there are no linear layers in the quantized model, and checks that the number of 
