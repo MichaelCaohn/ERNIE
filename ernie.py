@@ -50,7 +50,7 @@ class QuantizedLayer(nn.Module):
         """
         super(QuantizedLayer, self).__init__()
         self.pruned = type(layer) == PrunedLayer
-        
+        self.weightQuantizing = True
         self.weight, self.weight_table = self.quantize_params(layer.weight, n_clusters, init_method, error_checking, name, fast)
         
         if layer.bias is not None: # TODO - add check to make sure 2 ** 8 isn't more clusters than layer.bias.numel()
@@ -131,6 +131,7 @@ class QuantizedLayer(nn.Module):
             print("Quantized Layer weights (should be idxs): ", q_params)
             print("Centroid table: ", param_table)
             
+        self.weightQuantizing = False
         return q_params, param_table
         
     def forward(self, input_):
