@@ -247,7 +247,7 @@ class PrunedLayer(nn.Module):
         #indices = [(x // shape[1], x % shape[1]) for x in idxs.tolist()]
         #if self.weight.is_cuda:
         #    return mask.cuda(device=torch.device('cuda', self.weight.get_device()))
-        return mask.cuda()
+        return nn.Parameter(mask.cuda(), requires_grad=False)
     
     def forward(self, input_):
         '''print("type of weight tensor: ", type(self.weight))
@@ -259,9 +259,9 @@ class PrunedLayer(nn.Module):
         w = self.weight * self.mask
         bias = self.bias
         out = F.linear(input_, w, bias=bias)
-        if self.counter % 1001 == 0:
+        '''if self.counter % 1001 == 0:
             print(self.counter)
-            self.mask = self.prune(self.weight, self.prop, error_check=True)
+            self.mask = self.prune(self.weight, self.prop, error_check=True)'''
         return out
 def layer_check(model, numLin):
     """ Checks that there are no linear layers in the quantized model, and checks that the number of 
@@ -319,7 +319,7 @@ def quantize(model, num_centroids, error_checking=False, fast=False):
         
     return model
 
-def pruning(model, proportion=0.5, full_model=True):
+def pruning(model, proportion=0.7, full_model=True):
     for name, layer in model.named_children():
         if type(layer) == nn.Linear:
             print(name)
