@@ -193,10 +193,9 @@ class Trainer(object):
 
         for i, (batches, normalization) in enumerate(
                 self._accum_batches(train_iter)):
-            if (i % 1001) == 0:
-                reprune(self.model)
             step = self.optim.training_step
-
+            if (step % 1001) == 0:
+                reprune(self.model)
             if self.gpu_verbose_level > 1:
                 logger.info("GpuRank %d: index: %d", self.gpu_rank, i)
             if self.gpu_verbose_level > 0:
