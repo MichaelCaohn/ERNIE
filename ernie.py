@@ -322,7 +322,7 @@ def reprune(model):
     for name, layer in model.named_children():
         if type(layer) == PrunedLayer:
             repruned = True
-            PrunedLayer.mask = PrunedLayer.prune(PrunedLayer.weight * PrunedLayer.mask, PrunedLayer.step_prop, True)
+            layer.mask = layer.prune(layer.weight * layer.mask, layer.step_prop, True)
         else: 
             layer_types = [type(l) for l in layer.modules()]
             if PrunedLayer in layer_types:
