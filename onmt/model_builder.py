@@ -203,12 +203,12 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None, from_
             #model = quantize(model, 2 ** model_opt.n_clusters, fast=True)
             #print(model.encoder.transformer[0].self_attn.linear_keys.weight)
         model.load_state_dict(checkpoint['model'], strict=False)
-        proportionPruned(model)
+        #proportionPruned(model)
         #assert(False)
         print(model.encoder.transformer[0].self_attn.linear_keys.weight)
             
         generator.load_state_dict(checkpoint['generator'], strict=False)
-        proportionPruned(generator)
+        #proportionPruned(generator)
        
     else:
         if model_opt.param_init != 0.0:
