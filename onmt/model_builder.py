@@ -195,9 +195,10 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None, from_
         if from_quantized:
             print("LOADING A QUANTIZED MODEL IN")
             print("ACTUALLY IT'S PRUNED")
-            model = pruning(model, proportion=0.1)
-            print("Checkpoint model")
-            print(checkpoint['model'])
+            model = pruning(model, proportion=0.17)
+            generator = pruning(generator, proportion=0.17)
+            #print("Checkpoint model")
+            #print(checkpoint['model'])
             #print(model); assert(False)
             #model = quantize(model, 2 ** model_opt.n_clusters, fast=True)
             #print(model.encoder.transformer[0].self_attn.linear_keys.weight)
@@ -207,6 +208,8 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None, from_
         print(model.encoder.transformer[0].self_attn.linear_keys.weight)
             
         generator.load_state_dict(checkpoint['generator'], strict=False)
+        proportionPruned(generator)
+       
     else:
         if model_opt.param_init != 0.0:
             for p in model.parameters():
