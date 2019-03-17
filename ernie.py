@@ -320,6 +320,8 @@ def quantize(model, num_centroids, error_checking=False, fast=False):
     return model
 
 def pruning(model, proportion=0.7, full_model=True):
+    if proportion >= 1:
+        proportion = 0.7
     for name, layer in model.named_children():
         if type(layer) == nn.Linear:
             print(name)
