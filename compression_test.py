@@ -39,6 +39,7 @@ def proportionPruned(model):
 			layer += 1
 			zeros += tempZeros
 			ones += tempOnes
+	print(model)
 	print("Total weights: ", zeros+ones)
 	print("Total number of zeros: ", zeros)
 	print("Total number of ones: ", ones)
