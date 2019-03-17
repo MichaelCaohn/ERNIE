@@ -261,9 +261,6 @@ class PrunedLayer(nn.Module):
         w = self.weight * self.mask
         bias = self.bias
         out = F.linear(input_, w, bias=bias)
-        '''if self.counter % 1001 == 0:
-            print(self.counter)
-            self.mask = self.prune(self.weight, self.prop, error_check=True)'''
         return out
 def layer_check(model, numLin):
     """ Checks that there are no linear layers in the quantized model, and checks that the number of 
