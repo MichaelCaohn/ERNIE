@@ -200,7 +200,8 @@ class BinarizedLayer(nn.Module):
     def forward(self, input_):
         upper = self.c1 if self.c1 >= self.c2 else self.c2
         lower = self.c1 if self.c1 < self.c2 else self.c2
-        middle = upper-lower
+#         print(upper, lower)
+        middle = (upper+lower) / 2
         w = self.weights.clone()
         if self.pruned:
             w = w * self.mask
@@ -263,6 +264,7 @@ class PrunedLayer(nn.Module):
         bias = self.bias
         out = F.linear(input_, w, bias=bias)
         return out
+    
 def layer_check(model, numLin):
     """ Checks that there are no linear layers in the quantized model, and checks that the number of 
     quantized layers is equal to the number of initial linear layers.
@@ -307,6 +309,7 @@ def quantize(model, num_centroids, error_checking=False, fast=False):
     
     for name, layer in model.named_children():
         if type(layer) == nn.Linear:
+#             if "linear_" in name:
             print(name)
             model.__dict__['_modules'][name] = BinarizedLayer(layer, num_centroids, name=name, fast=fast)
         else:
@@ -318,6 +321,7 @@ def quantize(model, num_centroids, error_checking=False, fast=False):
         layer_check(model, num_linear)
         
     return model
+
 def reprune(model):
     repruned = False
     for name, layer in model.named_children():
