@@ -50,7 +50,7 @@ class QuantizedLayer(nn.Module):
         """
         super(QuantizedLayer, self).__init__()
         self.pruned = type(layer) == PrunedLayer
-        
+        self.weightQuantizing = True
         self.weight, self.weight_table = self.quantize_params(layer.weight, n_clusters, init_method, error_checking, name, fast)
         
         if layer.bias is not None: # TODO - add check to make sure 2 ** 8 isn't more clusters than layer.bias.numel()
@@ -131,6 +131,7 @@ class QuantizedLayer(nn.Module):
             print("Quantized Layer weights (should be idxs): ", q_params)
             print("Centroid table: ", param_table)
             
+        self.weightQuantizing = False
         return q_params, param_table
         
     def forward(self, input_):
@@ -215,24 +216,31 @@ class BinarizedLayer(nn.Module):
         return out
 
 class PrunedLayer(nn.Module):
-    def __init__(self, layer, prop=0.1, num_iters=10000):
+    def __init__(self, layer, start_prop=0.5, num_iters=10000, step_prop=0.04, num_steps=9):
         """ Implements class-uniform magnitude pruning, ie, prunes x% from the layer passed in
         prop - proportion to prune (eg 0.1 = 10% pruning)
         """
         super(PrunedLayer, self).__init__()
-        self.prop = 5
+        if start_prop + num_steps*step_prop >= 1:
+            raise ValueError("startprop {} + numsteps {} * stepprop {} >= 1.".format(start_prop, num_steps, step_prop))
+        self.step_prop = step_prop
         self.weight = layer.weight
-        self.mask = self.prune(layer.weight, prop)
+        self.mask = self.prune(layer.weight, start_prop)
         self.bias = layer.bias
         self.counter = 0
 
-    def prune(self, params, prop):
+    def prune(self, params, prop, error_check=False):
         # Technically may prune more than prop if there are multiple of the same weight
         k = int(prop*params.numel())
         shape = params.shape
         absv = params.abs()
         flattened = absv.flatten()
         topk_tensor = flattened[flattened.nonzero()]
+        if error_check:
+            print("k = ", k)
+            print("shape = ", shape)
+            print("flattened = ", flattened)
+            print("topk_tensor_flat = ", topk_tensor.flatten()) 
         tk, idxs = torch.topk(topk_tensor.flatten(), k, largest=False, sorted=True)
         threshold = tk[tk.numel()-1].item()
         ones = torch.ones(shape)
@@ -242,7 +250,7 @@ class PrunedLayer(nn.Module):
         #indices = [(x // shape[1], x % shape[1]) for x in idxs.tolist()]
         #if self.weight.is_cuda:
         #    return mask.cuda(device=torch.device('cuda', self.weight.get_device()))
-        return mask.cuda()
+        return nn.Parameter(mask.cuda(), requires_grad=False)
     
     def forward(self, input_):
         '''print("type of weight tensor: ", type(self.weight))
@@ -254,9 +262,6 @@ class PrunedLayer(nn.Module):
         w = self.weight * self.mask
         bias = self.bias
         out = F.linear(input_, w, bias=bias)
-        if self.counter % 1001 == 0:
-            print(self.counter)
-            self.mask = self.prune(self.weight, self.prop)
         return out
 def layer_check(model, numLin):
     """ Checks that there are no linear layers in the quantized model, and checks that the number of 
@@ -313,8 +318,22 @@ def quantize(model, num_centroids, error_checking=False, fast=False):
         layer_check(model, num_linear)
         
     return model
+def reprune(model):
+    repruned = False
+    for name, layer in model.named_children():
+        if type(layer) == PrunedLayer:
+            repruned = True
+            layer.mask = layer.prune(layer.weight * layer.mask, layer.step_prop, True)
+        else: 
+            layer_types = [type(l) for l in layer.modules()]
+            if PrunedLayer in layer_types:
+                reprune(layer)
+    if repruned:
+        print("Repruned the model!")
 
 def pruning(model, proportion=0.5, full_model=True):
+    if proportion >= 1:
+        proportion = 0.5
     for name, layer in model.named_children():
         if type(layer) == nn.Linear:
             print(name)

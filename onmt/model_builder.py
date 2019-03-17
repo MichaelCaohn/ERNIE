@@ -20,6 +20,7 @@ from onmt.utils.logging import logger
 from onmt.utils.parse import ArgumentParser
 
 from ernie import quantize, pruning
+from compression_test import proportionPruned
 
 def build_embeddings(opt, text_field, for_encoder=True):
     """
@@ -193,12 +194,22 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None, from_
         # end of patch for backward compatibility
         if from_quantized:
             print("LOADING A QUANTIZED MODEL IN")
-            model = quantize(model, 2 ** model_opt.n_clusters, fast=True)
-            print(model.encoder.transformer[0].self_attn.linear_keys.weight)
+            print("ACTUALLY IT'S PRUNED")
+            model = pruning(model, proportion=0.17)
+            generator = pruning(generator, proportion=0.17)
+            #print("Checkpoint model")
+            #print(checkpoint['model'])
+            #print(model); assert(False)
+            #model = quantize(model, 2 ** model_opt.n_clusters, fast=True)
+            #print(model.encoder.transformer[0].self_attn.linear_keys.weight)
         model.load_state_dict(checkpoint['model'], strict=False)
+        #proportionPruned(model)
+        #assert(False)
         print(model.encoder.transformer[0].self_attn.linear_keys.weight)
             
         generator.load_state_dict(checkpoint['generator'], strict=False)
+        #proportionPruned(generator)
+       
     else:
         if model_opt.param_init != 0.0:
             for p in model.parameters():
@@ -220,11 +231,11 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None, from_
             model.decoder.embeddings.load_pretrained_vectors(
                 model_opt.pre_word_vecs_dec)
     
+    model.generator = generator
     if not model_opt.from_quantized:
         print(model_opt.n_clusters)
         #quantize(model, 2 ** model_opt.n_clusters)
         pruning(model)
-    model.generator = generator
     model.to(device)
     if model_opt.model_dtype == 'fp16':
         model.half()
