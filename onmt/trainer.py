@@ -293,8 +293,9 @@ class Trainer(object):
                                report_stats):
         if self.grad_accum_count > 1:
             self.optim.zero_grad()
-
+        batch_start = datetime.now()
         for batch in true_batches:
+            batch_start = datetime.now()
             target_size = batch.tgt.size(0)
             # Truncated BPTT: reminder not compatible with accum > 1
             if self.trunc_size:
@@ -330,15 +331,13 @@ class Trainer(object):
                     shard_size=self.shard_size,
                     trunc_start=j,
                     trunc_size=trunc_size)
-#                 print("elapsed time for inference: ", datetime.now() - start_time)
+#                 print("elapsed time for loss", datetime.now() - start_time)
                 start_time = datetime.now()
                 if loss is not None:
                     self.optim.backward(loss)
-
-#                 print("elapsed time for backprop: ", datetime.now() - start_time)
+#                 print("elapsed time for optim backward", datetime.now() - start_time)
                 total_stats.update(batch_stats)
                 report_stats.update(batch_stats)
-                start_time = datetime.now()
                 # 4. Update the parameters and statistics.
                 if self.grad_accum_count == 1:
                     # Multi GPU gradient gather
@@ -349,14 +348,13 @@ class Trainer(object):
                         onmt.utils.distributed.all_reduce_and_rescale_tensors(
                             grads, float(1))
                     self.optim.step()
-#                 print("elapsed time for param update: ", datetime.now() - start_time)
                 # If truncated, don't backprop fully.
                 # TO CHECK
                 # if dec_state is not None:
                 #    dec_state.detach()
                 if self.model.decoder.state is not None:
                     self.model.decoder.detach_state()
-
+#             print('elapsed time for batch: ', datetime.now() - batch_start)
         # in case of multi step gradient accumulation,
         # update only after accum batches
         if self.grad_accum_count > 1:
