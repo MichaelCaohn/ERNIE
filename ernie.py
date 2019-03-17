@@ -215,14 +215,16 @@ class BinarizedLayer(nn.Module):
         return out
 
 class PrunedLayer(nn.Module):
-    def __init__(self, layer, prop=0.1, num_iters=10000):
+    def __init__(self, layer, start_prop=0.5, num_iters=10000, step_prop=0.04, num_steps=9):
         """ Implements class-uniform magnitude pruning, ie, prunes x% from the layer passed in
         prop - proportion to prune (eg 0.1 = 10% pruning)
         """
         super(PrunedLayer, self).__init__()
-        self.prop = 0.05
+        if start_prop + num_steps*step_prop >= 1:
+            raise ValueError("startprop {} + numsteps {} * stepprop {} >= 1.".format(start_prop, num_steps, step_prop))
+        self.step_prop = step_prop
         self.weight = layer.weight
-        self.mask = self.prune(layer.weight, prop)
+        self.mask = self.prune(layer.weight, start_prop)
         self.bias = layer.bias
         self.counter = 0
 
@@ -318,10 +320,22 @@ def quantize(model, num_centroids, error_checking=False, fast=False):
         layer_check(model, num_linear)
         
     return model
+def reprune(model):
+    repruned = False
+    for name, layer in model.named_children():
+        if type(layer) == PrunedLayer:
+            repruned = True
+            PrunedLayer.mask = PrunedLayer.prune(PrunedLayer.weight * PrunedLayer.mask, PrunedLayer.step_prop, True)
+        else: 
+            layer_types = [type(l) for l in layer.modules()]
+            if PrunedLayer in layer_types:
+                reprune(layer)
+    if repruned:
+        print("Repruned the model!")
 
-def pruning(model, proportion=0.7, full_model=True):
+def pruning(model, proportion=0.5, full_model=True):
     if proportion >= 1:
-        proportion = 0.7
+        proportion = 0.5
     for name, layer in model.named_children():
         if type(layer) == nn.Linear:
             print(name)

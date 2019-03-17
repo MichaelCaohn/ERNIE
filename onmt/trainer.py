@@ -16,6 +16,7 @@ import torch
 import onmt.utils
 from onmt.utils.logging import logger
 from datetime import datetime
+from ernie import reprune
 
 
 def build_trainer(opt, device_id, model, fields, optim, model_saver=None):
@@ -192,6 +193,8 @@ class Trainer(object):
 
         for i, (batches, normalization) in enumerate(
                 self._accum_batches(train_iter)):
+            if i % 1001 == 0:
+                reprune(model)
             step = self.optim.training_step
 
             if self.gpu_verbose_level > 1:
