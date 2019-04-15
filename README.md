@@ -1,4 +1,5 @@
-# OpenNMT-py: Open-Source Neural Machine Translation
+# Compressed Transformers (Work in Progress! paper here: http://web.stanford.edu/class/cs224n/reports/custom/15763707.pdf)
+OpenNMT-py: Open-Source Neural Machine Translation
 
 [![Build Status](https://travis-ci.org/OpenNMT/OpenNMT-py.svg?branch=master)](https://travis-ci.org/OpenNMT/OpenNMT-py)
 [![Run on FH](https://img.shields.io/badge/Run%20on-FloydHub-blue.svg)](https://floydhub.com/run?template=https://github.com/OpenNMT/OpenNMT-py)
